@@ -1,4 +1,12 @@
-# Tooling notes
+# Notes
+
+## Standing instructions
+
+- **Keep `README.md` updated as work progresses** (per user instruction,
+  2026-09-21). After each phase lands, update its row in the README status
+  table and the `## Status` note.
+
+## Tooling
 
 Hard-won, tooling-specific lessons. Keep terse.
 

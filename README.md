@@ -1,0 +1,63 @@
+# 30 Floors & a Pool
+
+A seeded 2D side-view water simulation with physically traced light. A tower
+is built beside a pool; the structure fails cell by cell under water,
+pressure, and user attack, and light is genuinely transported.
+
+Built in Flutter/Flame (desktop) on a pure-Dart core. The simulation itself
+is a pure-Dart package — headless-testable on any box; the GUI is the
+`app/` package.
+
+## Layout
+
+- `lib/core/` — the pure-Dart simulation core (no Flutter import):
+  - `constants.dart` — grid 220×240; floor 4 cells, bay 4 cells; timings.
+  - `rng.dart` — FNV-1a-64 seed hash → PCG32; forked sub-streams per world
+    section. Deterministic; integer-only; no `dart:math.Random` (ADR 0001).
+  - `settings.dart` — world settings (floors 1–50, width 1–5, structure
+    material) with validation.
+  - `materials.dart` — material enum + property table (tolerance/hp/buoyancy).
+  - `world.dart` — the cell-grid container (cell access, water/structural
+    bookkeeping, snapshot + fingerprint).
+  - `tower.dart` — `WorldBuilder`: ground, tower, floors/rooms, furniture,
+    lamps, pool.
+  - `lamp.dart` — the three lamp kinds (floor / ceiling / table) and states.
+- `test/phase1_test.dart` — determinism + structural invariants.
+- `app/` — the Flutter/Flame GUI (Phase 6). Not present yet.
+
+## Run
+
+```sh
+dart pub get
+dart test          # headless sim tests (Phases 1–5)
+dart analyze lib test
+```
+
+The GUI (Phase 6) is a separate `app/` Flutter package and is not yet
+authored.
+
+## Status
+
+Phases are defined in `PHASES.md`; each ends in a green `dart test` run and a
+commit. Decisions are in `PLAN.md`; the design context in `CONTEXT.md`.
+
+| Phase | Description | Status |
+|---|---|---|
+| 1 | Foundation: deterministic world generation | ✅ done |
+| 2 | Water physics (fall/flow, per-body head, erosion, jets) | not started |
+| 3 | Structural failure and buoyancy | not started |
+| 4 | Sun, tools, sim driver | not started |
+| 5 | Traced view (progressive light field) | not started |
+| 6 | GUI (Flutter/Flame) | not started |
+
+**Phase 1 is complete and committed.** Same seed+settings → byte-identical
+world built twice; different settings → different valid worlds; floor count =
+setting; 1–3 contiguous rooms/floor; no two items share a cell and ≤1 of each
+furniture type per room; pool present with fill 8 clamped; structure above the
+ground surface.
+
+## Notes
+
+- `NOTES.md` — tooling lessons learned while building (hung `dart test`,
+  generator debugging).
+- `docs/adr/0001-seeded-world.md` — the seeded-world determinism decision.
