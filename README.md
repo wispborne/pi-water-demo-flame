@@ -59,6 +59,13 @@ is a pure-Dart package — headless-testable on any box; the GUI is the
   fixed-timestep driver (pause, 0.5x/1x/2x, speed cycle).
 - `tool/phaseN_dump.dart` — per-phase headless artifacts: pure-Dart ASCII
   dumps of the sim into `out/phaseN/` (e.g. `dart run tool/phase4_dump.dart`).
+- `lib/trace/` — the traced view (Phase 5), pure Dart: `field.dart` (the
+  per-cell light field + the deterministic wave surface) and `tracer.dart`
+  (direct next-event rays, dirty-region re-convergence, ray budget).
+- `test/phase5_test.dart` — the standing checks: light blocked by a
+  one-cell partition, light through furniture, roofed-pool surface static
+  across the arc, open-pool glint under the sun, settle + local
+  re-convergence, warm submerged lamp, budget fallback/recovery.
 - `app/` — the Flutter/Flame GUI (Phase 6). Not present yet.
 
 ## Run
@@ -68,6 +75,8 @@ dart pub get
 dart test          # headless sim tests (Phases 1–5)
 dart analyze lib test
 dart run tool/phase4_dump.dart   # Phase 4 artifact: sun arc, tools, driver in out/phase4/
+dart run tool/phase5_dump.dart     # Phase 5 artifact: the four standing-check
+                                   # scenes as ASCII light fields in out/phase5/
 ```
 
 The GUI (Phase 6) is a separate `app/` Flutter package and is not yet
@@ -84,8 +93,34 @@ commit. Decisions are in `PLAN.md`; the design context in `CONTEXT.md`.
 | 2 | Water physics (fall/flow, per-body head, erosion, jets) | ✅ done |
 | 3 | Structural failure and buoyancy | ✅ done |
 | 4 | Sun, tools, sim driver | ✅ done |
-| 5 | Traced view (progressive light field) | not started |
+| 5 | Traced view (progressive light field) | ✅ done |
 | 6 | GUI (Flutter/Flame) | not started |
+
+**Phase 5 is complete and committed.** The traced view is a progressive
+light field, 1:1 with the 220×240 grid, in pure Dart (`lib/trace/`, zero
+Flutter imports). Every cell carries a running mean of its exact
+next-event-estimated light: direct rays to the known lights — the sun (with
+wavelength-dependent Beer–Lambert through water, so deep water reads dark
+blue-green, a forward-scatter shaft, and a specular glint band that follows
+the drawn wave slope) and every lit lamp (warm tungsten, 1/d² falloff) —
+marched cell by cell: structure/ground/wood block, glass tints, furniture
+passes. Rays are deterministic, so one sample is the settled value; a
+changing cell's value is a running mean that re-converges, so a change never
+flashes black. Per frame the tracer diffs the world (grid, spurt overlay,
+lamp positions/states), marks the changed cells dirty plus a margin, and
+spends a fixed 2,500-ray budget: dirty cells re-converge as the rotating
+sweep reaches them (a fresh field settles in ~0.7 s, a local edit
+re-converges only its box, every other cell bit-identical), and the
+remainder re-means a rotating stripe of undirty cells so the whole field
+follows the drifting sun with a sub-second lag. `TraceBudget` falls back to
+the plain view only on a sustained overrun (a full 2 s window over the cap)
+and recovers on a full window back under it. The standing checks are green:
+lamp light never crosses a solid wall (incl. one-cell partitions), light
+passes through furniture, a roofed pool's surface is static across the
+sun's arc, an open pool glitters brightest under the sun, and a submerged
+lamp reads warm amber. See the artifact: `dart run tool/phase5_dump.dart`
+writes the four standing-check scenes as ASCII light-field frames
+(materials + a luminance ramp) to `out/phase5/`.
 
 **Phase 4 is complete and committed.** The sun disc is a deterministic
 function of sim time: a 420 s cycle, rising from the left, crossing the top
