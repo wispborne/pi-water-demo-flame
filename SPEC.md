@@ -1,6 +1,6 @@
 # 30 Floors & a Pool — Product Specification
 
-A 2D side-view (cutaway) interactive web page: a multi-storey tower built from a grid of square cells, sitting beside a pool of water. Water floods the structure; the structure fails cell by cell under water, pressure, and user attack; loose items float or sink. The scene is lit by two modes: a plain day-sky view, and the traced view (the default), where light is genuinely transported through air, water, and glass.
+A 2D side-view (cutaway) interactive desktop program: a multi-storey tower built from a grid of square cells, sitting beside a pool of water. Water floods the structure; the structure fails cell by cell under water, pressure, and user attack; loose items float or sink. The scene is lit by two modes: a plain day-sky view, and the traced view (the default), where light is genuinely transported through air, water, and glass.
 
 Terminology follows `CONTEXT.md`; decisions of record live in `docs/adr/`.
 
@@ -37,7 +37,7 @@ Terminology follows `CONTEXT.md`; decisions of record live in `docs/adr/`.
   Placement never exceeds room bounds; if an item does not fit, that draw is redrawn once, then skipped.
 - **Lamps** (three kinds): a floor lamp on the room floor; a ceiling lamp fixed to the ceiling until the slab above it breaks — it then falls as a loose lamp that stays lit until it itself breaks; a table lamp sitting on a table if the room drew one, otherwise on the room floor (fallback to a floor lamp).
 - A **"New seed"** button (new seed, new world) and a **"Reset"** button (rebuilds the *current* seed). Reset and New seed clear all user modifications and restore the exact t=0 state: pool at its initial fill, rain at default (0), sun at cycle start, speed 1×, camera refit.
-- The seed is **shareable by name** and **passable in the URL**.
+- The seed is **shareable by name** and **passable as a startup argument**.
 
 ## 3. Materials
 

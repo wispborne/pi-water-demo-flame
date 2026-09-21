@@ -1,19 +1,17 @@
 # Implementation Plan — 30 Floors & a Pool (Flame, Flutter desktop)
 
-**Target platform: desktop, not browser.** The spec's "interactive web page" is
-retrofit: this is a Flutter **desktop** app (Windows primary, per the dev
-machine). `flutter create --platform=windows,linux,macos`. Consequences:
+**Target platform: desktop.** Flutter **desktop** app (Windows primary, per
+the dev machine). `flutter create --platform=windows,linux,macos`.
 
-- **Traced view**: no WebGL feature-detection story; on desktop we can assume a
-  decent GPU is usually present, but the fallback contract still stands — if the
-  tracer can't sustain its frame budget (or the device "gives up" mid-run,
-  i.e. sustained frame overruns), fall back to plain view; toggle re-enables
-  when it recovers.
-- **URL seed**: becomes "seed in the title bar / startup arg". Seed stays
-  shareable by name (a text field) — `dart run` argument or an in-app field.
-  URL param support is not required on desktop.
+- **Traced view**: no WebGL feature-detection story; on desktop we can
+  assume a decent GPU is usually present, but the fallback contract still
+  stands — if the tracer can't sustain its frame budget (or the device
+  "gives up" mid-run, i.e. sustained frame overruns), fall back to plain
+  view; toggle re-enables when it recovers.
+- **Seed**: shareable by name (a text field in the UI) and passable as a
+  `--seed` startup argument.
 - Mouse-only input is fine; no touch concerns.
-- Everything else in SPEC.md / CONTEXT.md / ADR 0001 carries over unchanged.
+- SPEC.md, CONTEXT.md, and ADR 0001 are written for this target.
 
 ## Overall shape
 
@@ -121,5 +119,3 @@ single-key tower blast.)
    pool + ground + margin, small enough for the tracer budget.
 2. Tracer ray budget per frame and the light-field resolution.
 3. Sun cycle: 7 minutes of *sim time* or wall clock (speed scales it — it's
-   sim time, per SPEC §9 "scales physics, sun, and glow together").
-4. Seed in URL: N/A on desktop — seed field + `--seed` startup arg.

@@ -1,6 +1,6 @@
 # 30 Floors & a Pool
 
-The product context for a 2D side-view interactive web page: a seeded tower built beside a pool of water, where the structure fails cell by cell under water, pressure, and user attack, and where light is physically traced.
+The product context for a 2D side-view interactive desktop program: a seeded tower built beside a pool of water, where the structure fails cell by cell under water, pressure, and user attack, and where light is physically traced.
 
 ## Language
 
@@ -36,7 +36,7 @@ _Avoid_: depth, force
 ### Tower
 
 **Seed**:
-The text or number that deterministically determines the whole world — stage layout and tower; shareable by name and passable in the URL.
+The text or number that deterministically determines the whole world — stage layout and tower; shareable by name and passable as a startup argument.
 _Avoid_: world id, random
 
 **Floor**:
