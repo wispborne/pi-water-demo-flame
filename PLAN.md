@@ -77,6 +77,88 @@ desktop app. Falling-sand on a ~180×100 grid is cheap; the tracer is the
 budget consumer and is low-res by design. Smoke-test the full loop early (a
 30-floor world mid-flood, traced view on) rather than at the end.
 
+## Technique choices (evaluated 2025)
+
+Chosen and rejected options, so the tradeoffs are on the record. Both domains were
+checked against current practice (semi-Lagrangian / "Stable Fluids" grid fluids;
+progressive Monte Carlo path tracing with NEE/MIS).
+
+### Water — keep the falling-sand cellular model, add cheap realism
+**Rejected: a per-tick Eulerian velocity field + sparse-Poisson pressure
+projection (Stam's "Stable Fluids" advection→diffusion→projection loop, or the
+MAC/staggered-grid + conjugate-gradient Poisson solve).** It is the classic
+*continuous* grid-fluid method, but it is not more efficient or more realistic
+here: (a) the world is a 220×240 **cell** grid, not a continuous field, so a
+velocity field on edges + a divergence-free projection would be a second,
+heavier model bolted over the cell sim; (b) it would replace per-body pressure
+with a global pressure solve, breaking the contract (one head per connected
+body, erosion when head > material tolerance, jets, buoyancy) that the 4 standing
+checks and Phases 2–3 are written against; (c) it buys nothing the cell model
+doesn't already give, at higher cost per tick.
+
+**Chosen: falling-sand cellular water (the cell-discretized form of the
+semi-Lagrangian "Stable Fluids" method — unconditionally stable because a whole
+cell moves rather than a velocity being interpolated), refined with the cheap
+realism terms grid fluids use:**
+- **Backward (semi-Lagrangian) advection** is the stability choice and is
+  implicit in the cell model: each water cell steps one row down or one column
+  sideways per tick, so the field never overshoots (unconditionally stable) —
+  the cellular analog of Stam's semi-Lagrangian advection.
+- **Per-body hydrostatic head** (BFS flood-fill → one head per connected body,
+  carried sideways) is the discrete pressure-integral; erode a wall only when
+  head > material tolerance. This is the physically meaningful part and stays.
+- **Volumetric momentum (vorticity-confinement analog)**: a water cell carries a
+  small decaying lateral velocity, so thin sheets, pour-off, and jets have
+  persistent sideways motion instead of freezing into a brick. This is the
+  cheap, standard anti-numerical-damping term (vorticity confinement / momentum
+  advection) ported to the cell model — the one realism term worth adding.
+- **Water volume is conserved**: no water is created or destroyed except by
+  erosion (wall → rubble) and tools; asserted in Phase 2 tests so the sim can't
+  silently leak mass.
+
+### Traced view — NEE + MIS, not BDPT / photon maps / neural sampling
+**Chosen: progressive per-cell Monte Carlo with Next Event Estimation +
+Multiple Importance Sampling**, which is the standard, robust modern setup for a
+scene with a **small set of known, bright, finite lights** (1 sun + a few dozen
+lamps) plus a participating medium (water):
+- **NEE**: from each sampled point, directly ray to each known light (sun +
+  lamps) instead of relying on random path hits. This is the dominant
+  variance-reduction / efficiency win for exactly this scene — a handful of
+  known, finite, bright sources. Without it a diffuse point would almost never
+  hit a lamp by random bounce.
+- **MIS**: balance the NEE estimator against the BSDF (path) estimator so the
+  two combine with low variance and no double-counting. This is the modern way
+  to use NEE; it keeps the caustic/focus paths (which NEE alone under-samples)
+  from going black while the diffuse/soft-shadow paths stay clean.
+- **Cosine-weighted hemisphere sampling** for the diffuse bounces (cheap and
+  unbiased).
+- **Temporal accumulation + dirty-region re-convergence** (already the plan):
+  per-pixel accumulation with a short lag following slow changes (the drifting
+  sun); converged undirty pixels keep their value. (ReSTIR-style spatiotemporal
+  resampling is the current frontier and is the natural future upgrade, but
+  classic per-pixel accumulation is the pragmatic choice for a low-res
+  progressive field and keeps the budget predictable.)
+- **Participating medium (water)**: per-ray Beer–Lambert / depth-attenuation
+  stepping with **wavelength-dependent absorption (red dies before green)** and
+  forward-scattering shafts. This is the standard efficient+realistic treatment
+  for a 2D cutaway; exact multiple-scattering photon Monte Carlo is the
+  realistic extreme but is far too costly per frame for a low-res field.
+
+**Rejected (with reasons):**
+- **Bidirectional path tracing (BDPT)** — needs a camera *and* a light path plus
+  connection/weighting machinery, designed for 3D scenes with many bounces.
+  This is a 2D cutaway rendered as a per-cell *light field*, not per-pixel
+  camera rays, with a small known light set — BDPT's machinery adds cost with
+  no benefit here.
+- **Photon mapping / photon tracing** — a precomputed, static photon map does not
+  fit a dynamic, dirty-region, per-cell field that re-converges as water moves
+  and walls break.
+- **Neural / learned importance sampling (learned light selection, learned BRDF
+  sampling)** — the scene has a fixed, small set of materials (air / water /
+  glass / structure / furniture) and a small known light set. Analytic NEE +
+  MIS + cosine sampling already capture the variance reduction; a learned sampler
+  adds training + inference cost for a fixed, known scene.
+
 ## Layout
 
 Two packages (decision 5): a root pure-Dart package that owns all simulation

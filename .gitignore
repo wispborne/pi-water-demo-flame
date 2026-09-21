@@ -1,0 +1,10 @@
+# Dart
+.dart_tool/
+.packages
+build/
+*.g.dart
+
+# Flutter
+.flutter-plugins*
+ios/Flutter/
+android/local.properties
