@@ -39,6 +39,14 @@ is a pure-Dart package — headless-testable on any box; the GUI is the
   - `buoyancy.dart` — loose objects: rigid furniture masses and free lamps
     plus granular rubble/debris; water displacement, floats rising,
     heavies sinking; ceiling lamps release and fall lit.
+  - `sun.dart` — the sun disc: a deterministic function of sim time (420 s
+    cycle, left-right arc, freezes when the world is paused).
+  - `tools.dart` — the eight user tools (hammer, bomb, water, erase, four
+    build materials) with a 1–15 cell brush, plus rain (0–40 water cells
+    per sim-second on the top row, uniform left to right).
+- `sim.dart` — the fixed-timestep driver: wall-clock time × speed scale
+  (0.5/1/2, paused at 0) → physics ticks at 30/s; owns the sim clock, the
+  sun, and the tools; water volume is conserved through it.
 - `test/phase1_test.dart` — determinism + structural invariants.
 - `test/phase2_test.dart` — water contract: settle/level, per-body head
   erosion, tolerance boundaries, jets, volume conservation.
@@ -46,8 +54,11 @@ is a pure-Dart package — headless-testable on any box; the GUI is the
   3-cell gap, 2-cell gap bridges, slump → rubble, deep water washes rubble
   out of a vertical column, floats rest at the surface, heavies sink,
   water displacement conserves volume, ceiling lamp releases.
+- `test/phase4_test.dart` — sun determinism, the eight tools (hammer to
+  rubble, bomb falloff, build/erase, rain at 3 rates, keys 1–8), and the
+  fixed-timestep driver (pause, 0.5x/1x/2x, speed cycle).
 - `tool/phaseN_dump.dart` — per-phase headless artifacts: pure-Dart ASCII
-  dumps of the sim into `out/phaseN/` (e.g. `dart run tool/phase3_dump.dart`).
+  dumps of the sim into `out/phaseN/` (e.g. `dart run tool/phase4_dump.dart`).
 - `app/` — the Flutter/Flame GUI (Phase 6). Not present yet.
 
 ## Run
@@ -56,7 +67,7 @@ is a pure-Dart package — headless-testable on any box; the GUI is the
 dart pub get
 dart test          # headless sim tests (Phases 1–5)
 dart analyze lib test
-dart run tool/phase3_dump.dart   # Phase 3 artifact: collapse frames in out/phase3/
+dart run tool/phase4_dump.dart   # Phase 4 artifact: sun arc, tools, driver in out/phase4/
 ```
 
 The GUI (Phase 6) is a separate `app/` Flutter package and is not yet
@@ -72,9 +83,26 @@ commit. Decisions are in `PLAN.md`; the design context in `CONTEXT.md`.
 | 1 | Foundation: deterministic world generation | ✅ done |
 | 2 | Water physics (fall/flow, per-body head, erosion, jets) | ✅ done |
 | 3 | Structural failure and buoyancy | ✅ done |
-| 4 | Sun, tools, sim driver | not started |
+| 4 | Sun, tools, sim driver | ✅ done |
 | 5 | Traced view (progressive light field) | not started |
 | 6 | GUI (Flutter/Flame) | not started |
+
+**Phase 4 is complete and committed.** The sun disc is a deterministic
+function of sim time: a 420 s cycle, rising from the left, crossing the top
+at mid-cycle, setting at the right, and looping — frozen when the world is
+paused. The eight user tools work on a 1–15 cell brush: the hammer removes
+one strength per hit (structure breaks to rubble at 0, other materials to
+debris; ground is untouchable), the bomb deals decaying falloff damage
+(centre worst, radius edge one), water/erase paint, and the four build
+materials place their cell (ground never overwritable). Rain spawns
+0–40 water cells per sim-second on the top row, uniform left to right, and
+scales exactly with the speed scale. The sim driver is a fixed-timestep
+accumulator: wall-clock time × speed scale (0.5/1/2, paused at 0) →
+30 physics ticks per sim-second, so 2x advances the sim state (sun, water,
+structure, tools) exactly twice as fast per wall second. See the artifact:
+`dart run tool/phase4_dump.dart` writes the sun arc, the hammer sequence,
+the bomb blasts, and 3 sim-seconds of rain at 0.5x/1x/2x (all reaching the
+same sim time and spawning the same 90 drops) to `out/phase4/`.
 
 **Phase 3 is complete and committed.** A section that loses its load path to
 the foundation (severed by a support gap of ≥ 3 air cells; gaps of ≤ 2 still

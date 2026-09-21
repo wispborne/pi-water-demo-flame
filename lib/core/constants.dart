@@ -28,8 +28,18 @@ class Constants {
   /// Physics: 30 ticks/s at 1x; slump lasts 2 sim-seconds (decision 4).
   static const int physicsTicksPerSec = 30;
 
-  /// Slump duration in ticks: 2 sim-seconds (decision 4).
+  /// Tools: brush size 1..15 cells (default 5); rain 0..40 cells/s (SPEC 8/9).
+  static const int brushMin = 1;
+  static const int brushMax = 15;
+  static const int brushDefault = 5;
+  static const int rainMax = 40;
   static const int slumpTicks = 60;
+
+  /// Sun arc (SPEC 6): the disc rises at the left edge, peaks at row
+  /// [sunTopY], sets at the right edge; [sunArcDepth] is the arc's sag
+  /// below its top at the horizon.
+  static const int sunTopY = 6;
+  static const int sunArcDepth = 34;
 
   /// Sun: full cycle is 420 sim-seconds (decision 3).
   static const double sunCycleSec = 420.0;
