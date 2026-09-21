@@ -77,32 +77,51 @@ desktop app. Falling-sand on a ~180×100 grid is cheap; the tracer is the
 budget consumer and is low-res by design. Smoke-test the full loop early (a
 30-floor world mid-flood, traced view on) rather than at the end.
 
-## Layout (when starting)
+## Layout
+
+Two packages (decision 5): a root pure-Dart package that owns all simulation
+and light physics, and `app/` — a Flutter/Flame package that depends on it by
+path. Everything in the root package runs headless; `dart test` covers it
+without a display.
 
 ```
+pubspec.yaml           # root package: name, dart sdk constraint
 lib/
-  main.dart            # app shell, seed arg, HUD overlay (Stack)
-  game/water_game.dart # FlameGame: loop, camera, input routing
-  core/                # pure Dart, no Flutter imports
+  main.dart            # CLI entry: --seed arg, runs the sim headless (debug)
+  core/                # pure Dart, zero Flutter imports
+    constants.dart     # grid dims, floor/bay geometry, material table, timings
     rng.dart           # seeded PRNG — seed + settings → world (ADR 0001)
-    world.dart         # grid, cells, water bodies
-    tower.dart         # generation: floors/rooms/furniture/lamps/pool
-    water.dart         # falling sand, pressure, jets, cascade
+    materials.dart     # material enum, properties (tolerance, hp, buoyancy)
+    world.dart         # grid container, cell access, water bodies, dirty tracking
+    tower.dart         # generation: floors/rooms/furniture/lamps/pool/ground
+    water.dart         # falling sand, per-body pressure, jets, cascade
     structure.dart     # load-path severance (gap ≥ 3 cells) → rubble slump
     buoyancy.dart      # float/sink: furniture per table, rubble sinks, debris floats
-    sun.dart           # ~7-min cycle, freezes on pause
+    sun.dart           # ~7-min cycle (sim time), freezes on pause
     tools.dart         # 8 tools, brush 1–15 (default 5), initial tool = Water
-  trace/tracer.dart    # progressive light field, dirty regions, fallback
-  ui/hud.dart          # counters, hover readout, controls, sliders
-test/standing_checks.dart # the 4 named scenarios, headless (no game loop)
+  trace/               # pure Dart, zero Flutter imports
+    tracer.dart        # progressive light field, dirty regions, fallback contract
+    field.dart         # light-field state: accumulation, convergence, dirty tiles
+  sim.dart             # fixed-timestep driver: tick(world) — the one entry point
+test/                  # dart test, headless
+  determinism_test.dart# same seed+settings → identical world, twice; across settings
+  structure_test.dart  # severance → slump; gaps ≤ 2 bridge
+  pressure_test.dart   # per-body head; sheet carries deep head
+  standing_checks.dart # the 4 named scenarios (SPEC §11)
+app/                   # Flutter/Flame package (created when Flutter SDK available)
+  pubspec.yaml         # depends on root package by path
+  lib/main.dart        # app shell, seed arg, HUD overlay (Stack)
+  lib/game/water_game.dart # FlameGame: loop, camera, input routing
+  lib/ui/hud.dart      # counters, hover readout, controls, sliders
+  lib/render/grid_painter.dart # one CustomPainter per frame; water wavy line
 ```
 
 **Key architectural rule**: `core/` and `trace/` are plain Dart with zero
 Flutter imports. The 4 standing checks (lamp light blocked by solid walls
 incl. 1-cell partitions; lamp light passes through furniture; roofed pool
 surface static across the sun's arc; open pool glitters brightest under the
-sun) run headless in a test. The Flame layer is thin: loop + camera + input +
-paint.
+sun) run headless in the root package's tests. The Flame layer is thin:
+loop + camera + input + paint.
 
 ## Standing checks (SPEC §11)
 1. Lamp light must not cross a solid wall — including one-cell partitions.
@@ -114,8 +133,42 @@ paint.
 contract. There is no user-facing way to flood the world — no flood tool, no
 single-key tower blast.)
 
-## Open decisions (decide before coding)
-1. Exact grid dimensions (fixed constants) — must fit 30 floors × 5 bays +
-   pool + ground + margin, small enough for the tracer budget.
-2. Tracer ray budget per frame and the light-field resolution.
-3. Sun cycle: 7 minutes of *sim time* or wall clock (speed scales it — it's
+## Decisions (resolved)
+1. **Grid: 220 × 240 cells (W × H).** Floor height 4 cells (1 slab + 3 interior),
+   bay 4 cells wide → max tower 50 × 4 = 200 cells. Ground surface level seeded
+   12–28 cells above the bottom; sky margin ≥ 12 cells. Rain distributes
+   uniformly across the full 220 width. (The earlier ~180×100 estimate cannot
+   fit a 50-floor tower at 4 cells/floor.)
+2. **Tracer**: light field 1:1 with the grid (220 × 240 px). Budget:
+   1,500–2,500 pixel-light shadow rays per frame at 1× (30 t/s), measured over a
+   2 s window; sustained overrun → fall back to plain view. Convergence window
+   ~1 s; dirty regions re-converge, undirty pixels keep their value.
+3. **Sun: sim time.** Full cycle = 420 sim-seconds at 1×; speed scales it,
+   pause (scale 0) freezes it.
+4. **Physics: fixed-timestep accumulator, 30 ticks/s at 1×** (0.5× → 15,
+   2× → 60). Slump duration 2 sim-seconds.
+5. **Package shape**: one root pure-Dart package (zero Flutter imports in
+   `lib/core` and `lib/trace`, testable with `dart test`); `app/` is a separate
+   Flutter/Flame package (created with the Flutter SDK in the GUI phase)
+   depending on the root package by path. The 4 standing checks run headless in
+   the root package's tests.
+6. **Material properties** (tolerance = water-head in cells that erodes it;
+   hp = tool-damage to destroy):
+
+   | Material | Tolerance | hp | Note |
+   |---|---|---|---|
+   | glass | 2 | 2 | very weak, floats a little |
+   | wood | 6 | 3 | |
+   | concrete | 12 | 8 | |
+   | reinforced concrete | 20 | 12 | default structure |
+   | steel | 30 | 20 | |
+   | titanium | 40 | 30 | |
+   | ground | ∞ | ∞ | very hard |
+
+   Rubble: broken heavy, pass-through, sinks. Debris: broken light,
+   pass-through, floats.
+7. **PRNG**: FNV-1a 64-bit hash of (seed string + settings) → PCG32 (pure-Dart,
+   integer-only, stable across platforms); forked sub-streams per world section.
+   No `math.random`.
+8. **Jets**: head ≥ 8 cells → spurt upward from open cracks; spurt height
+   ≈ head / 2, capped at 12 cells.
