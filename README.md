@@ -31,7 +31,8 @@ is a pure-Dart package — headless-testable on any box; the GUI is the
   - `water.dart` — falling-sand water: per-body BFS head (carried sideways),
     erosion at head > material tolerance, lateral momentum, jets (a
     head ≥ 8 confined body spurts out of an open crack as a held spurt
-    column), volume conserved.
+    column), wash (flowing water scours rubble/debris sideways), volume
+    conserved.
   - `structure.dart` — structural failure: a section severed from the
     foundation (support gap ≥ 3 air cells; gaps ≤ 2 bridge) slumps for
     ~2 sim-seconds, then breaks into rubble (heavy materials) or debris.
@@ -42,9 +43,9 @@ is a pure-Dart package — headless-testable on any box; the GUI is the
 - `test/phase2_test.dart` — water contract: settle/level, per-body head
   erosion, tolerance boundaries, jets, volume conservation.
 - `test/phase3_test.dart` — structure + buoyancy contract: severance at a
-  3-cell gap, 2-cell gap bridges, slump → rubble, floats rest at the
-  surface, heavies sink, water displacement conserves volume, ceiling lamp
-  releases.
+  3-cell gap, 2-cell gap bridges, slump → rubble, deep water washes rubble
+  out of a vertical column, floats rest at the surface, heavies sink,
+  water displacement conserves volume, ceiling lamp releases.
 - `tool/phaseN_dump.dart` — per-phase headless artifacts: pure-Dart ASCII
   dumps of the sim into `out/phaseN/` (e.g. `dart run tool/phase3_dump.dart`).
 - `app/` — the Flutter/Flame GUI (Phase 6). Not present yet.
@@ -81,7 +82,8 @@ bridge) slumps for ~2 sim-seconds and then breaks into rubble (heavy
 materials) or debris; a re-braced section is saved. Loose objects obey
 buoyancy: a rigid float rises through water and rests exactly at the surface
 (fully submerged to rise; water displaced, never overlapped), heavy objects
-sink to the floor, granular rubble/debris move cell by cell, and water volume
+sink to the floor, granular rubble/debris move cell by cell, and flowing
+water washes them sideways out of a vertical column (SPEC 4); water volume
 is conserved through every move. A ceiling lamp fixed to a slab is released
 when the slab breaks and falls lit, then floats at the surface. See the
 artifact: `dart run tool/phase3_dump.dart` writes ASCII frames of a full

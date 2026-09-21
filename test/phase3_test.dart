@@ -57,6 +57,14 @@ int countAtRow(World w, Material m, int y) {
   return n;
 }
 
+int countMaterialWithX(World w, Material m, int xmin) {
+  var n = 0;
+  for (var i = 0; i < w.cells.length; i++) {
+    if (w.cells[i] == m && i % Constants.gridW >= xmin) n++;
+  }
+  return n;
+}
+
 void main() {
   test('severing the load path by 3 cells slumps the slab into rubble', () {
     final w = ground();
@@ -148,5 +156,25 @@ void main() {
     expect(lamp.lit, isTrue);
     expect(lamp.y, greaterThan(230));
     expect(w.at(lamp.x, lamp.y), Material.lamp);
+  });
+  test('deep water washes rubble sideways out of a vertical column', () {
+    final w = ground();
+    // Floor + left wall (titanium, head 11 < tolerance 40: no erosion), open
+    // to the right.
+    w.fillRect(80, 237, 119, 237, Material.titanium);
+    w.fillRect(80, 220, 80, 237, Material.titanium);
+    // Water body on the left: x 81..98, surface row 225 (head 11).
+    w.fillRect(81, 225, 98, 236, Material.water);
+    // Rubble column at x=99, rows 226..236 (sticking up into the pool).
+    w.fillRect(99, 226, 99, 236, Material.rubble);
+    final water = Water();
+    final before = water.countWater(w);
+    drive(w, water, Structure(), 300);
+    // Volume conserved: water and rubble only move, never appear/vanish.
+    expect(water.countWater(w), before);
+    expect(countMaterial(w, Material.rubble), 11);
+    // The wash: rubble no longer sits in a single vertical column — some of
+    // it has been pushed sideways out of the x=99 line.
+    expect(countMaterialWithX(w, Material.rubble, 100), greaterThan(0));
   });
 }

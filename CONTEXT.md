@@ -63,14 +63,17 @@ A material that blocks water and light: the four structure materials, ground, an
 _Avoid_: solid, barrier
 
 **Pass-through**:
-Material water moves through unimpeded: all furniture, rubble, and debris.
+Material water is not blocked against: furniture is displaced as a rigid mass (water levels out around it); rubble and debris are washed cell by cell. Water never occupies a pass-through cell.
 _Avoid_: permeable
 
+**Wash**:
+The water-driven lateral motion of granular material: a flowing water cell pushes an adjacent rubble or debris cell into the open air beyond it, scouring broken material sideways.
+
 **Rubble**:
-Broken heavy building material; water passes through it unimpeded; sinks.
+Broken heavy building material; sinks; washed sideways by flowing water.
 
 **Debris**:
-Broken light things (furniture, wood); water passes through it unimpeded; floats.
+Broken light things (furniture, wood); floats; washed sideways by flowing water.
 ### Light
 
 **Light**:

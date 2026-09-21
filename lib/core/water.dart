@@ -41,6 +41,9 @@ class Spurt {
 ///   cannot rise) and the spurt column is drawn from [Spurt] state, always
 ///   contiguous on top of the dropping surface.
 ///
+/// * **Wash** — a sideways water move aimed at rubble or debris pushes the
+///   grain into the open air beyond it and takes its cell (SPEC 4: deep
+///   water washes rubble away); volume is conserved.
 /// Water volume is conserved: movement never creates or destroys water;
 /// water appears only via erosion (a wall cell crumbles into water), tools,
 /// and rain (a spurt's cells fall back into the column when the jet stops).
@@ -274,8 +277,9 @@ class Water {
         final x = ltr ? c : (W - 1 - c);
         final idx = y * W + x;
         if (w.cells[idx] != Material.water) continue;
-        // Fall first: a cell over an empty or pass-through cell drops
-        // (water moves through furniture, rubble, and debris unimpeded).
+        // Fall first: a cell over an empty cell drops (water never enters
+        // rubble/debris — the granular cells sink/float out of the way by
+        // swap, in the buoyancy pass).
         if (_move(w, idx, 0, 1)) continue;
         // The fall failed (below is water, a wall, or the bottom row):
         // flow sideways, so water levels out (finds its own level).
@@ -298,6 +302,9 @@ class Water {
     if (_move(w, idx, dir, 0)) {
       return; // the push carried
     }
+    if (wash(w, idx, x, y, dir)) {
+      return; // the wash carried
+    }
     if (_blocked(w, x + dir, y)) {
       // Pushing into a wall: the sheet bounces its push back, so a sheet
       // keeps running off the wall it came from (pour-off).
@@ -314,10 +321,10 @@ class Water {
     return !_canEnter(w.at(x, y));
   }
 
-  /// Move the water cell at [src] to (x+dx, y+dy). Water passes through
-  /// rubble and debris (broken material washes away) and never into a wall
-  /// or another water cell; loose objects (furniture, lamps) block it — they
-  /// move by buoyancy, and water levels out around them (displacement).
+  /// Move the water cell at [src] to (x+dx, y+dy). Water never into rubble/
+  /// debris (they settle by buoyancy; the lateral wash is [wash]) nor into a
+  /// wall or another water cell; loose objects (furniture, lamps) block it —
+  /// they move by buoyancy, and water levels out around them (displacement).
   /// Falling straight down resets the lateral push (a fresh start); a
   /// sideways move carries it.
   bool _move(World w, int src, int dx, int dy) {
@@ -332,6 +339,27 @@ class Water {
     w.strength[t] = 0;
     w.cells[src] = Material.air;
     momentum[t] = (dy > 0 && dx == 0) ? 0 : momentum[src];
+    head[t] = head[src];
+    return true;
+  }
+
+  /// Push the granular cell (rubble/debris) a sideways move is aimed at:
+  /// the grain slides into the air cell beyond it and the water takes the
+  /// grain's cell — the wash (SPEC 4 "deep water washes rubble away").
+  /// No-op unless the grain's far side is open air.
+  bool wash(World w, int src, int x, int y, int dir) {
+    final W = Constants.gridW;
+    final tx = x + dir, bx = x + 2 * dir;
+    if (tx < 0 || tx >= W || bx < 0 || bx >= W) return false;
+    final t = y * W + tx;
+    final m = w.cells[t];
+    if (m != Material.rubble && m != Material.debris) return false;
+    if (!_canEnter(w.cells[y * W + bx])) return false;
+    w.cells[y * W + bx] = m;
+    w.cells[t] = Material.water;
+    w.strength[t] = 0;
+    w.cells[src] = Material.air;
+    momentum[t] = momentum[src];
     head[t] = head[src];
     return true;
   }

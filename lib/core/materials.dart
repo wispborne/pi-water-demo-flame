@@ -12,8 +12,8 @@ enum Material {
   titanium,
   glass,
   wood,
-  rubble, // broken heavy building material; pass-through; sinks
-  debris, // broken light things (furniture, wood); pass-through; floats
+  rubble, // broken heavy building material; washed by flowing water; sinks
+  debris, // broken light things; washed by flowing water; floats
   water,
   chair,
   plant,
