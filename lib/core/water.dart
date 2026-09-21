@@ -8,6 +8,7 @@ import 'world.dart';
 class Spurt {
   /// The topmost spurt cell row (derived each tick: surface - height).
   int top = -1;
+
   /// The spurt's cell count (its height).
   int h = 0;
 
@@ -60,10 +61,10 @@ class Water {
   final List<Spurt> spurts;
 
   Water()
-      : momentum = List.filled(Constants.gridW * Constants.gridH, 0),
-        head = List.filled(Constants.gridW * Constants.gridH, 0),
-        bodyHead = List.filled(Constants.gridW * Constants.gridH, 0),
-        spurts = [for (var i = 0; i < Constants.gridW; i++) Spurt()];
+    : momentum = List.filled(Constants.gridW * Constants.gridH, 0),
+      head = List.filled(Constants.gridW * Constants.gridH, 0),
+      bodyHead = List.filled(Constants.gridW * Constants.gridH, 0),
+      spurts = [for (var i = 0; i < Constants.gridW; i++) Spurt()];
 
   /// The total water volume: the grid's water plus the spurt overlay's cells
   /// (a spurt's cells are out of the grid; counting them keeps volume
@@ -142,12 +143,12 @@ class Water {
         if (maxHead > colMaxHead[x]) colMaxHead[x] = maxHead;
       }
       _erode(w, body, maxHead);
-      // A jet needs a confined body (some surface column covered by a
-      // non-passable cell) escaping through an open crack.
+      // A jet needs a confined body: at least one surface column covered
+      // by a real wall (furniture and rubble do not count — they move).
       var confined = false;
       for (final e in surf.entries) {
         final sx = e.key, sy = e.value;
-        if (sy > 0 && !_canEnter(w.at(sx, sy - 1))) {
+        if (sy > 0 && Materials.blocksWater(w.at(sx, sy - 1))) {
           confined = true;
           break;
         }
@@ -313,10 +314,12 @@ class Water {
     return !_canEnter(w.at(x, y));
   }
 
-  /// Move the water cell at [src] to (x+dx, y+dy); it moves into empty or
-  /// pass-through cells (furniture, rubble, debris, lamp) — never into a
-  /// wall or another water cell. Falling straight down resets the lateral
-  /// push (a fresh start); a sideways move carries it.
+  /// Move the water cell at [src] to (x+dx, y+dy). Water passes through
+  /// rubble and debris (broken material washes away) and never into a wall
+  /// or another water cell; loose objects (furniture, lamps) block it — they
+  /// move by buoyancy, and water levels out around them (displacement).
+  /// Falling straight down resets the lateral push (a fresh start); a
+  /// sideways move carries it.
   bool _move(World w, int src, int dx, int dy) {
     final W = Constants.gridW;
     final H = Constants.gridH;
@@ -333,12 +336,9 @@ class Water {
     return true;
   }
 
-  /// True when a moving water cell may enter the cell: empty or pass-through
-  /// (furniture, rubble, debris, lamp). Never a wall, never another water.
-  static bool _canEnter(Material m) =>
-      m == Material.air ||
-      m == Material.rubble ||
-      m == Material.debris ||
-      m == Material.lamp ||
-      Materials.isFurniture(m);
+  /// True when a moving water cell may enter the cell: only empty air.
+  /// Water never overwrites rubble/debris (they settle by buoyancy, SPEC 5)
+  /// and never a wall or a loose object (furniture / lamp) — those move via
+  /// buoyancy, and water levels out around them (displacement).
+  static bool _canEnter(Material m) => m == Material.air;
 }

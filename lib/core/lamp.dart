@@ -8,15 +8,20 @@ enum LampState { fixed, free, broken }
 /// breaks (SPEC section 2).
 class Lamp {
   final LampKind kind;
-  final int x;
-  final int y;
+  int x;
+  int y;
   LampState state;
 
   /// A lit lamp glows (traced view lights it; Phase 5 uses this).
   bool lit;
 
-  Lamp(this.kind, this.x, this.y,
-      {this.state = LampState.fixed, this.lit = true});
+  Lamp(
+    this.kind,
+    this.x,
+    this.y, {
+    this.state = LampState.fixed,
+    this.lit = true,
+  });
 
   bool get isLit => lit && state != LampState.broken;
 

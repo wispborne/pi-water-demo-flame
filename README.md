@@ -32,11 +32,21 @@ is a pure-Dart package — headless-testable on any box; the GUI is the
     erosion at head > material tolerance, lateral momentum, jets (a
     head ≥ 8 confined body spurts out of an open crack as a held spurt
     column), volume conserved.
-  - `loose.dart` — loose objects (furniture/lamp/broken cells) and the
-    buoyancy rules (Phase 3 engine, rules defined).
+  - `structure.dart` — structural failure: a section severed from the
+    foundation (support gap ≥ 3 air cells; gaps ≤ 2 bridge) slumps for
+    ~2 sim-seconds, then breaks into rubble (heavy materials) or debris.
+  - `buoyancy.dart` — loose objects: rigid furniture masses and free lamps
+    plus granular rubble/debris; water displacement, floats rising,
+    heavies sinking; ceiling lamps release and fall lit.
 - `test/phase1_test.dart` — determinism + structural invariants.
 - `test/phase2_test.dart` — water contract: settle/level, per-body head
   erosion, tolerance boundaries, jets, volume conservation.
+- `test/phase3_test.dart` — structure + buoyancy contract: severance at a
+  3-cell gap, 2-cell gap bridges, slump → rubble, floats rest at the
+  surface, heavies sink, water displacement conserves volume, ceiling lamp
+  releases.
+- `tool/phaseN_dump.dart` — per-phase headless artifacts: pure-Dart ASCII
+  dumps of the sim into `out/phaseN/` (e.g. `dart run tool/phase3_dump.dart`).
 - `app/` — the Flutter/Flame GUI (Phase 6). Not present yet.
 
 ## Run
@@ -45,6 +55,7 @@ is a pure-Dart package — headless-testable on any box; the GUI is the
 dart pub get
 dart test          # headless sim tests (Phases 1–5)
 dart analyze lib test
+dart run tool/phase3_dump.dart   # Phase 3 artifact: collapse frames in out/phase3/
 ```
 
 The GUI (Phase 6) is a separate `app/` Flutter package and is not yet
@@ -59,10 +70,22 @@ commit. Decisions are in `PLAN.md`; the design context in `CONTEXT.md`.
 |---|---|---|
 | 1 | Foundation: deterministic world generation | ✅ done |
 | 2 | Water physics (fall/flow, per-body head, erosion, jets) | ✅ done |
-| 3 | Structural failure and buoyancy | not started |
+| 3 | Structural failure and buoyancy | ✅ done |
 | 4 | Sun, tools, sim driver | not started |
 | 5 | Traced view (progressive light field) | not started |
 | 6 | GUI (Flutter/Flame) | not started |
+
+**Phase 3 is complete and committed.** A section that loses its load path to
+the foundation (severed by a support gap of ≥ 3 air cells; gaps of ≤ 2 still
+bridge) slumps for ~2 sim-seconds and then breaks into rubble (heavy
+materials) or debris; a re-braced section is saved. Loose objects obey
+buoyancy: a rigid float rises through water and rests exactly at the surface
+(fully submerged to rise; water displaced, never overlapped), heavy objects
+sink to the floor, granular rubble/debris move cell by cell, and water volume
+is conserved through every move. A ceiling lamp fixed to a slab is released
+when the slab breaks and falls lit, then floats at the surface. See the
+artifact: `dart run tool/phase3_dump.dart` writes ASCII frames of a full
+collapse (intact → mid-slump → broken → settled) to `out/phase3/`.
 
 **Phase 2 is complete and committed.** Spawned water falls and settles at the
 basin floor; a contained pool levels out and rests at exactly its depth; a

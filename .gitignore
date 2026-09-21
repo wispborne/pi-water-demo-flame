@@ -8,3 +8,6 @@ build/
 .flutter-plugins*
 ios/Flutter/
 android/local.properties
+
+# Demo artifacts (ASCII frames from tool/ dumps)
+out/

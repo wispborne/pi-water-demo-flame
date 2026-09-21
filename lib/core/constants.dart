@@ -27,7 +27,9 @@ class Constants {
 
   /// Physics: 30 ticks/s at 1x; slump lasts 2 sim-seconds (decision 4).
   static const int physicsTicksPerSec = 30;
-  static const double slumpSeconds = 2.0;
+
+  /// Slump duration in ticks: 2 sim-seconds (decision 4).
+  static const int slumpTicks = 60;
 
   /// Sun: full cycle is 420 sim-seconds (decision 3).
   static const double sunCycleSec = 420.0;

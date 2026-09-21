@@ -11,12 +11,20 @@ import 'package:water_tower/core/world.dart';
 /// Scenarios build on a bare (ungenerated) world + a ground slab so the
 /// geometry is exact and independent of the seeded tower.
 void main() {
-  World bare() =>
-      World(const Settings(floors: 30, width: 3, material: 'concrete'), 'phase2');
+  World bare() => World(
+    const Settings(floors: 30, width: 3, material: 'concrete'),
+    'phase2',
+  );
 
   /// Fill rows [topY]..239 with ground (the scenario floor).
   void ground(World w, int topY) {
-    w.fillRect(0, topY, Constants.gridW - 1, Constants.gridH - 1, Material.ground);
+    w.fillRect(
+      0,
+      topY,
+      Constants.gridW - 1,
+      Constants.gridH - 1,
+      Material.ground,
+    );
   }
 
   int _surfaceRow(World w, int x) {
@@ -39,8 +47,11 @@ void main() {
     for (var i = 0; i < w.cells.length; i++) {
       if (w.cells[i] != Material.water) continue;
       final y = i ~/ Constants.gridW;
-      expect(y, greaterThanOrEqualTo(230),
-          reason: 'water cell at row $y above the basin floor');
+      expect(
+        y,
+        greaterThanOrEqualTo(230),
+        reason: 'water cell at row $y above the basin floor',
+      );
     }
   });
 
@@ -86,8 +97,11 @@ void main() {
     w.set(40, 237, Material.glass);
     final eng = Water();
     for (var t = 0; t < 800; t++) eng.tick(w);
-    expect(w.at(40, 237), isNot(Material.glass),
-        reason: 'the sheet did not erode the low-tolerance partition');
+    expect(
+      w.at(40, 237),
+      isNot(Material.glass),
+      reason: 'the sheet did not erode the low-tolerance partition',
+    );
     expect(w.destroyedCount, greaterThanOrEqualTo(1));
   });
 
@@ -105,8 +119,11 @@ void main() {
     final eng = Water();
     for (var t = 0; t < 400; t++) eng.tick(w);
     for (var y = 230; y < 238; y++) {
-      expect(w.at(21, y), Material.steel,
-          reason: 'steel wall eroded at row $y under head 8');
+      expect(
+        w.at(21, y),
+        Material.steel,
+        reason: 'steel wall eroded at row $y under head 8',
+      );
     }
   });
 
@@ -152,11 +169,18 @@ void main() {
     final surf = _surfaceRow(w, 20);
     expect(s.active, isTrue, reason: 'no spurt at the crack column');
     expect(s.h, greaterThanOrEqualTo(5), reason: 'spurt too short: ${s.h}');
-    expect(s.h, lessThanOrEqualTo(
-        (16 ~/ 2) > Constants.jetMaxHeight ? Constants.jetMaxHeight : 16 ~/ 2));
+    expect(
+      s.h,
+      lessThanOrEqualTo(
+        (16 ~/ 2) > Constants.jetMaxHeight ? Constants.jetMaxHeight : 16 ~/ 2,
+      ),
+    );
     // The spurt column is contiguous on top of the dropping pool surface.
-    expect(s.top, surf - s.h,
-        reason: 'spurt top ${s.top} != surface $surf minus height ${s.h}');
+    expect(
+      s.top,
+      surf - s.h,
+      reason: 'spurt top ${s.top} != surface $surf minus height ${s.h}',
+    );
     expect(eng.isSpurtCell(20, surf - 1), isTrue);
     expect(eng.isSpurtCell(20, s.top), isTrue);
   });
@@ -173,8 +197,11 @@ void main() {
     final v0 = eng.countWater(w);
     for (var t = 0; t < 500; t++) {
       eng.tick(w);
-      expect(eng.countWater(w), v0,
-          reason: 'volume changed at tick $t: ${eng.countWater(w)} != $v0');
+      expect(
+        eng.countWater(w),
+        v0,
+        reason: 'volume changed at tick $t: ${eng.countWater(w)} != $v0',
+      );
     }
   });
 }

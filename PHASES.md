@@ -4,6 +4,19 @@ Each phase ends in a green `dart test` run and a commit. Dependencies flow
 forward: later phases never re-open earlier ones. Phases 1–5 are pure Dart
 and fully headless-testable on any box; Phase 6 is the GUI.
 
+**User-verifiable artifact.** Each phase also ships a runnable, human-
+inspectable artifact so the result is checkable before the next phase is
+built on top (no coding to the end to find a mismatch):
+
+|Phase|Artifact (run it, look at it)|
+|---|---|
+|1|`tool/phase1_dump.dart` → ASCII frame of the generated world (seed, floors, rooms, pool)|
+|2|`tool/phase2_dump.dart` → ASCII frames: pool settling to depth, erosion of a weak wall, a jet|
+|3|`tool/phase3_dump.dart` → ASCII frames: severance → rubble slump, lamp release, flooded room (sofa up, fridge/TV down)|
+|4|`tool/phase4_dump.dart` → ASCII timeline: sun arc, hammer/bomb damage, rain counts, 0.5×/1×/2× speed|
+|5|`tool/phase5_dump.dart` → ASCII light-field frames for the 4 standing checks|
+|6|The running desktop app itself (`flutter run -d linux`)|
+
 The test bar is behaviour and invariants only — no source-text, wiring, or
 default-pinning assertions (see workflow: tests defend observable contracts).
 

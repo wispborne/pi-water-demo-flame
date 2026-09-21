@@ -50,7 +50,11 @@ class Materials {
     Material.rebar: const MaterialProps(20, 12, false),
     Material.steel: const MaterialProps(30, 20, false),
     Material.titanium: const MaterialProps(40, 30, false),
-    Material.glass: const MaterialProps(2, 2, true), // very weak, floats a little
+    Material.glass: const MaterialProps(
+      2,
+      2,
+      true,
+    ), // very weak, floats a little
     Material.wood: const MaterialProps(6, 3, true),
     Material.rubble: const MaterialProps(-1, 999, false),
     Material.debris: const MaterialProps(-1, 999, true),
@@ -79,8 +83,16 @@ class Materials {
   };
 
   static const Set<Material> furnitureTypes = {
-    Material.chair, Material.plant, Material.tv, Material.fridge, Material.desk,
-    Material.table, Material.counter, Material.bed, Material.tub, Material.sofa,
+    Material.chair,
+    Material.plant,
+    Material.tv,
+    Material.fridge,
+    Material.desk,
+    Material.table,
+    Material.counter,
+    Material.bed,
+    Material.tub,
+    Material.sofa,
   };
 
   /// Wall class (SPEC section 3): blocks water and light.
@@ -119,6 +131,12 @@ class Materials {
   static bool isFurniture(Material m) => furnitureTypes.contains(m);
 
   static bool floats(Material m) => of(m).floats;
+
+  /// The broken form of a material (SPEC 5 / CONTEXT.md): heavy structure
+  /// becomes sinking rubble; everything else that can break (furniture,
+  /// wood, glass, lamps) becomes floating debris.
+  static Material breaksInto(Material m) =>
+      structure.contains(m) ? Material.rubble : Material.debris;
 
   static int clampPoolFill(int poolDepth) => min(Constants.poolFill, poolDepth);
 }
