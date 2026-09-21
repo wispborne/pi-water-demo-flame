@@ -24,11 +24,19 @@ is a pure-Dart package — headless-testable on any box; the GUI is the
     material) with validation.
   - `materials.dart` — material enum + property table (tolerance/hp/buoyancy).
   - `world.dart` — the cell-grid container (cell access, water/structural
-    bookkeeping, snapshot + fingerprint).
+    bookkeeping, destroyed-cell counter, snapshot + fingerprint).
   - `tower.dart` — `WorldBuilder`: ground, tower, floors/rooms, furniture,
     lamps, pool.
   - `lamp.dart` — the three lamp kinds (floor / ceiling / table) and states.
+  - `water.dart` — falling-sand water: per-body BFS head (carried sideways),
+    erosion at head > material tolerance, lateral momentum, jets (a
+    head ≥ 8 confined body spurts out of an open crack as a held spurt
+    column), volume conserved.
+  - `loose.dart` — loose objects (furniture/lamp/broken cells) and the
+    buoyancy rules (Phase 3 engine, rules defined).
 - `test/phase1_test.dart` — determinism + structural invariants.
+- `test/phase2_test.dart` — water contract: settle/level, per-body head
+  erosion, tolerance boundaries, jets, volume conservation.
 - `app/` — the Flutter/Flame GUI (Phase 6). Not present yet.
 
 ## Run
@@ -50,17 +58,19 @@ commit. Decisions are in `PLAN.md`; the design context in `CONTEXT.md`.
 | Phase | Description | Status |
 |---|---|---|
 | 1 | Foundation: deterministic world generation | ✅ done |
-| 2 | Water physics (fall/flow, per-body head, erosion, jets) | not started |
+| 2 | Water physics (fall/flow, per-body head, erosion, jets) | ✅ done |
 | 3 | Structural failure and buoyancy | not started |
 | 4 | Sun, tools, sim driver | not started |
 | 5 | Traced view (progressive light field) | not started |
 | 6 | GUI (Flutter/Flame) | not started |
 
-**Phase 1 is complete and committed.** Same seed+settings → byte-identical
-world built twice; different settings → different valid worlds; floor count =
-setting; 1–3 contiguous rooms/floor; no two items share a cell and ≤1 of each
-furniture type per room; pool present with fill 8 clamped; structure above the
-ground surface.
+**Phase 2 is complete and committed.** Spawned water falls and settles at the
+basin floor; a contained pool levels out and rests at exactly its depth; a
+thin sheet running off a wall pushes with the deep body's full head (erodes a
+low-tolerance partition); walls with tolerance > head are untouched, with
+tolerance < head erode; a confined body with head ≥ 8 jets upward out of an
+open crack (sustained, contiguous spurt); water volume is conserved over long
+runs (grid + spurt overlay).
 
 ## Notes
 

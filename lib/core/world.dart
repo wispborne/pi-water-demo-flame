@@ -33,6 +33,8 @@ class World {
   /// base for damage: cells that exist at t=0).
   int originalStructuralCount = 0;
 
+  /// Cells destroyed by any cause (tools, erosion, severance) — HUD counter.
+  int destroyedCount = 0;
   /// Lamp objects in the world (kind + state tracked separately).
   List<Lamp> lamps = [];
 
