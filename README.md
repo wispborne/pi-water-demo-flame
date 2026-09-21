@@ -7,6 +7,10 @@ pressure, and user attack, and light is genuinely transported.
 Built in Flutter/Flame (desktop) on a pure-Dart core. The simulation itself
 is a pure-Dart package — headless-testable on any box; the GUI is the
 `app/` package.
+Built end-to-end by a **local LLM** — no cloud LLM and no human editing.
+It's a for-fun proof-of-concept side project: the model drives the whole
+build (design, code, tests, debugging) on the developer's own machine.
+
 
 ## Layout
 
