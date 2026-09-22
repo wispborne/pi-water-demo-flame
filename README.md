@@ -150,6 +150,12 @@ rendered black in the GUI. The march is now a proper grid DDA (Amanatides
 & Woo) over the exact line; the shadow of the tower under a low sun is a
 clean diagonal from its top corner, matching the screenshot.
 
+**Fix (2026-09-22).** The HUD text was nearly invisible: the app had no
+dark theme, so `Text` defaulted to near-black on the dark panels. The
+`MaterialApp` now carries a dark theme (scaffold background `0xFF0B0E14`,
+cyan accent for the sliders and dropdown), and the counters, hover readout,
+buttons, seed field, and key hints are legible in the running app.
+
 
 **Phase 5 is complete and committed.** The traced view is a progressive
 light field, 1:1 with the 220×240 grid, in pure Dart (`lib/trace/`, zero

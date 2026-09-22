@@ -75,6 +75,14 @@ class _WaterAppState extends State<WaterApp> {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: '30 Floors & a Pool',
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF0B0E14),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF4FD8E8),
+          brightness: Brightness.dark,
+        ),
+      ),
       home: Scaffold(
         backgroundColor: const Color(0xFF0B0E14),
         body: Stack(
