@@ -10,10 +10,16 @@ import 'package:water_tower_app/sim_state.dart';
 /// the sliders. A Flutter overlay over the game canvas; it reads [SimState]
 /// at 10 Hz (a [Timer]) so it never blocks the render loop.
 class HudOverlay extends StatefulWidget {
-  const HudOverlay({super.key, required this.state, required this.game});
+  const HudOverlay({
+    super.key,
+    required this.state,
+    required this.game,
+    required this.gameFocus,
+  });
 
   final SimState state;
   final WaterGame game;
+  final FocusNode gameFocus;
 
   @override
   State<HudOverlay> createState() => _HudOverlayState();
@@ -244,7 +250,12 @@ class _HudOverlayState extends State<HudOverlay> {
 
   Widget _btn(String label, VoidCallback onTap) {
     return TextButton(
-      onPressed: onTap,
+      onPressed: () {
+        onTap();
+        // A tapped button takes keyboard focus; hand it back to the game
+        // so the key shortcuts keep working (SPEC 8).
+        widget.gameFocus.requestFocus();
+      },
       style: TextButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
         minimumSize: const Size(0, 28),

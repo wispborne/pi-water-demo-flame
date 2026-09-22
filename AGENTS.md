@@ -4,6 +4,9 @@ Commit and push regularly. When a piece of work is complete and verified, commit
 
 Keep `README.md` updated as work progresses: after each phase lands, update its row in the status table and the `## Status` note.
 
+## Screenshots
+
+Never use webp; this will cause the entire conversation to break. Only use PNG or JPEG images.
 
 ## ntfy Notifications
 

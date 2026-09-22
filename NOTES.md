@@ -7,8 +7,25 @@
   table and the `## Status` note.
 
 ## Tooling
-
 Hard-won, tooling-specific lessons. Keep terse.
+
+## Screenshotting the running Windows app
+
+- The repo's `out/shot*.png` screenshots come from a helper PowerShell
+  script (kept in `out/`, which is gitignored). The method: enumerate
+  visible windows with Win32 `EnumWindows`, pick the one titled
+  `water_tower_app`, force it to the foreground, `CopyFromScreen` its
+  rect.
+- **`SetForegroundWindow` alone is silently ignored** when the calling
+  process doesn't own the foreground. What works: a synthetic Alt
+  keypress (`keybd_event 0x12 down/up`) to release the foreground lock,
+  then `ShowWindow(SW_RESTORE)` + `SetForegroundWindow`, then a short
+  sleep before the capture.
+- `CopyFromScreen` grabs the *screen*, so the target must actually be
+  in front: a terminal covering it will be captured instead. Verify the
+  PNG shows the app window before trusting it.
+- Run: `powershell -NoProfile -ExecutionPolicy Bypass -File out/_shot.ps1`.
+
 
 ## `dart test` hangs and zombies
 

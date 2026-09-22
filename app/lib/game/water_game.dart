@@ -142,7 +142,8 @@ class FieldBlitter {
     final w = Constants.gridW;
     final h = Constants.gridH;
     final raw = field.rgbaPixels();
-    final im = img.Image.fromBytes(width: w, height: h, bytes: raw.buffer, format: img.Format.uint8);
+    final im = img.Image.fromBytes(
+        width: w, height: h, bytes: raw.buffer, format: img.Format.uint8, numChannels: 4);
     final png = img.encodePng(im);
     ui.instantiateImageCodec(png)
         .then((codec) => codec.getNextFrame())

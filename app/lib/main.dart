@@ -85,8 +85,11 @@ class _WaterAppState extends State<WaterApp> {
               autofocus: true,
               onKeyEvent: _onKey,
               child: Listener(
-                onPointerDown: (e) =>
-                    widget.game.pointerDown(e.position.dx, e.position.dy, e.buttons),
+                onPointerDown: (e) {
+                  _gameFocus.requestFocus();
+                  widget.game.pointerDown(
+                      e.position.dx, e.position.dy, e.buttons);
+                },
                 onPointerMove: (e) =>
                     widget.game.pointerMove(e.position.dx, e.position.dy, e.buttons),
                 onPointerUp: (e) => widget.game.pointerUp(e.buttons),
@@ -98,7 +101,11 @@ class _WaterAppState extends State<WaterApp> {
                 child: GameWidget(game: widget.game),
               ),
             ),
-            HudOverlay(state: widget.state, game: widget.game),
+            HudOverlay(
+              state: widget.state,
+              game: widget.game,
+              gameFocus: _gameFocus,
+            ),
           ],
         ),
       ),
