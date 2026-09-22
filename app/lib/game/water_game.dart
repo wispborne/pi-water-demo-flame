@@ -31,6 +31,7 @@ class WaterGame extends FlameGame {
   (double, double)? _lastMouse;
   bool _leftDown = false;
   bool _rightDown = false;
+  bool _midDown = false;
 
   /// The cell under the cursor (for the hover readout); (-1, -1) when
   /// outside the world.
@@ -87,13 +88,14 @@ class WaterGame extends FlameGame {
       _applyTool(x, y);
     }
     if (buttons & 2 != 0) _rightDown = true;
+    if (buttons & 4 != 0) _midDown = true;
   }
 
   void pointerMove(double x, double y, int buttons) {
     _setHover(x, y);
     final last = _lastMouse;
     if (last != null) {
-      if (_rightDown) cam.pan(x - last.$1, y - last.$2);
+      if (_rightDown || _midDown) cam.pan(x - last.$1, y - last.$2);
       if (_leftDown) _applyTool(x, y);
     }
     _lastMouse = (x, y);
@@ -102,10 +104,13 @@ class WaterGame extends FlameGame {
   void pointerUp(int buttons) {
     if (buttons & 1 == 0) _leftDown = false;
     if (buttons & 2 == 0) _rightDown = false;
+    if (buttons & 4 == 0) _midDown = false;
   }
 
   void scroll(double x, double y, double dy) {
-    final factor = math.pow(1.1, -dy).toDouble();
+    // ~120 logical px per mouse wheel notch: one notch = x1.1;
+    // trackpads send small continuous deltas and zoom smoothly.
+    final factor = math.pow(1.1, -dy / 120).toDouble();
     cam.zoomAt(x, y, factor);
   }
 

@@ -236,7 +236,7 @@ class _HudOverlayState extends State<HudOverlay> {
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    'keys 1-8 tools · LMB apply · RMB pan · wheel zoom',
+                    'keys 1-8 tools · LMB apply · RMB/MMB pan · wheel zoom',
                     style: TextStyle(fontSize: 11, color: Colors.white54),
                   ),
                 ],

@@ -95,7 +95,8 @@ class _WaterAppState extends State<WaterApp> {
                 onPointerUp: (e) => widget.game.pointerUp(e.buttons),
                 onPointerSignal: (e) {
                   if (e is PointerScrollEvent) {
-                    widget.game.scroll(e.position.dx, e.position.dy, e.delta.dy);
+                    widget.game.scroll(
+                        e.position.dx, e.position.dy, e.scrollDelta.dy);
                   }
                 },
                 child: GameWidget(game: widget.game),

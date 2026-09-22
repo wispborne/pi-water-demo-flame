@@ -1,11 +1,11 @@
 // Phase 6 testable contract (PHASES.md):
 // - the camera fits the whole world at load and after Reset / New seed;
 // - speed / pause / scale propagate to the sim driver;
-// - the traced view falls back to the plain view on sustained overrun
-//   and the toggle re-enables on recovery.
-import 'package:water_tower/core/materials.dart' as core;
+import 'package:flutter/gestures.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:water_tower/core/constants.dart';
+import 'package:water_tower/core/materials.dart' as core;
 import 'package:water_tower/core/tools.dart';
 import 'package:water_tower/trace/tracer.dart';
 import 'package:water_tower_app/camera.dart';
@@ -140,6 +140,51 @@ void main() {
       s.tools.tool = Tool.values[k - 1];
       expect(s.tool, Tool.values[k - 1]);
     }
+  });
+
+  test('middle button drag pans the camera', () {
+    final game = WaterGame(SimState('seed-42'));
+    final before = (game.cam.offX, game.cam.offY);
+    game.pointerDown(100, 100, 4);
+    game.pointerMove(130, 80, 4);
+    expect(game.cam.offX, closeTo(before.$1 + 30, 1e-9));
+    expect(game.cam.offY, closeTo(before.$2 - 20, 1e-9));
+    // No zoom side effect.
+    game.pointerUp(0);
+    expect(game.cam.cellPx, 3);
+  });
+
+  testWidgets('mouse wheel over the canvas zooms at the cursor',
+      (tester) async {
+    final state = SimState('seed-42');
+    final game = WaterGame(state);
+    await tester.pumpWidget(WaterApp(state: state, game: game));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    final before = (game.cam.cellPx, game.cam.offX, game.cam.offY);
+    final center = Offset(400, 300);
+    // A Windows wheel notch is ~120 logical px; the signal event carries
+    // it in scrollDelta (PointerScrollEvent.delta stays Offset.zero).
+    final signal = PointerScrollEvent(
+      position: center,
+      scrollDelta: const Offset(0, -120),
+      kind: PointerDeviceKind.mouse,
+    );
+    final listener = tester.allRenderObjects
+        .whereType<RenderPointerListener>()
+        .firstWhere((l) => l.onPointerSignal != null);
+    listener.onPointerSignal?.call(signal);
+    await tester.pump();
+    // One notch zooms in (x1.1) and the world point under the cursor
+    // stays fixed.
+    expect(game.cam.cellPx, closeTo(before.$1 * 1.1, 1e-9));
+    final wx0 = (center.dx - before.$2) / before.$1;
+    final wy0 = (center.dy - before.$3) / before.$1;
+    final wx1 = (center.dx - game.cam.offX) / game.cam.cellPx;
+    final wy1 = (center.dy - game.cam.offY) / game.cam.cellPx;
+    expect(wx1, closeTo(wx0, 1e-9));
+    expect(wy1, closeTo(wy0, 1e-9));
+    game.dispose();
   });
 
   testWidgets('app builds: the HUD shows the counters and controls',
