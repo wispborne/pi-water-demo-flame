@@ -6,6 +6,56 @@
   2026-09-21). After each phase lands, update its row in the README status
   table and the `## Status` note.
 
+## UI Pass — Findings (2026-09-22, approved-for-future-sessions)
+
+Live review of the running app (captures in `out/shot9.png`,
+`out/shot_hover.png`) + code read. Ordered by importance.
+
+1. **Contrast bug: black text on the dark panels (bottom bar + hover
+   readout).** `app/lib/main.dart:75` — `MaterialApp` has no `theme`, so
+   `Text` defaults follow the *light* theme (`Colors.black87`) while the
+   scaffold is dark `0xFF0B0E14` and the HUD panels are dark `0xCC101828`
+   (`app/lib/ui/hud.dart:91,128`). The counter row (`water … damage …
+   FPS … seed … tool`) and the hover readout are nearly invisible in
+   every capture. Fix: give `MaterialApp` a dark theme
+   (`ThemeData(brightness: Brightness.dark, scaffoldBackgroundColor:
+   Color(0xFF0B0E14))`); slider tracks, the seed `TextField`, and the
+   `DropdownButton` menu inherit it. Optionally theme the accent to cyan
+   to match the water. Verify: screenshot with `out/_shot.ps1`, all
+   HUD text legible.
+2. **Hover readout missing the SPEC 10 colour-coded strength bar.**
+   SPEC.md §10: the hover readout must show remaining strength *with a
+   colour-coded bar*. `app/lib/ui/hud.dart:97-106` (`_hoverPanel`)
+   renders `HP $hp/$maxHp head $head` as text only (the traced-mode
+   light swatch at 107-118 is present). Fix: add a ~60×6 bar filled
+   `hp/maxHp`, colour lerping green→amber→red as it drops. Verify:
+   hammer a structural cell, hover it, bar shrinks and recolors.
+3. **Hover crosshair is sub-pixel at the default fit zoom.**
+   `app/lib/render/grid_painter.dart:272-282` — stroke `0.08` *world*
+   units; at fit zoom (cellPx ≈ 3) that is ~0.24 px on screen, so no
+   outline is visible in the captures. Fix: screen-constant stroke,
+   e.g. pass `cam.cellPx` into `_drawHover` and use
+   `strokeWidth: 1.5 / cellPx`. Verify: crisp 1–2 px outline at fit
+   zoom and at 8× zoom.
+4. **Key-hint line omits the P/S/G/T/R/N shortcuts.**
+   `app/lib/ui/hud.dart:238-241` shows only
+   `keys 1-8 tools · LMB apply · RMB/MMB pan · wheel zoom`, but the app
+   also has P pause, S speed, G glow, T path trace, R reset, N new seed
+   (`app/lib/main.dart:42-62`; README documents them). Fix: extend the
+   hint string (the row is horizontally scrollable, length is fine).
+5. **Dead `IgnorePointer(ignoring: false)` wrapper in the HUD build.**
+   `app/lib/ui/hud.dart:66-74` — `ignoring: false` is the identity
+   transform; return the `Stack` directly. Verify: `flutter analyze` +
+   the 13 GUI contract tests in `app/test/`.
+6. **(Cosmetic) Window title is `water_tower_app`** — `app/windows/runner/main.cpp:30`;
+   `MaterialApp(title: '30 Floors & a Pool')` in main.dart:77 does not
+   affect the OS title bar.
+
+Notes on what was verified live: traced light field, sun, lamps,
+glow, water, bottom-bar layout, buttons, sliders, dropdown, seed field
+all render. The hover readout *contents* were confirmed via a
+pressed-drag capture (see the Tooling note below on why plain
+synthetic hover cannot be captured).
 ## Tooling
 Hard-won, tooling-specific lessons. Keep terse.
 
@@ -46,6 +96,15 @@ Hard-won, tooling-specific lessons. Keep terse.
   block early. Keep block text paren-free.
 - Test with `cmd /c path\to\run.bat`, and confirm the launched process
   with `tasklist | findstr`.
+
+## Synthetic mouse input on the app
+
+- `SetCursorPos` alone emits NO `WM_MOUSEMOVE` — the app's hover readout
+  never updates for a teleported cursor. What works: press LMB first
+  (`mouse_event 0x0002`), then `SetCursorPos` in small steps (pressed
+  moves route to the down target), release (`0x0004`). Use a **debug**
+  build (`flutter build windows --debug`) when VM-service inspection is
+  needed: the release exe has no VM service.
 
 
 ## `dart test` hangs and zombies
