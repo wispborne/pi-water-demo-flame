@@ -109,8 +109,8 @@ class _HudOverlayState extends State<HudOverlay> {
             Container(
               width: 16,
               height: 16,
-              color: Color.fromARGB(255, r, g, b),
               decoration: BoxDecoration(
+                color: Color.fromARGB(255, r, g, b),
                 border: Border.all(color: Colors.white54),
                 borderRadius: BorderRadius.circular(3),
               ),

@@ -13,8 +13,7 @@ if errorlevel 1 (
   exit /b 1
 )
 
-if not exist "%EXE%" (
-  echo Building the Windows release, first run only.
+  echo Building the Windows release.
   pushd app
   flutter build windows --release
   popd
@@ -23,7 +22,6 @@ if not exist "%EXE%" (
     pause
     exit /b 1
   )
-)
 
 start "" "%EXE%"
 endlocal

@@ -1,4 +1,4 @@
-import 'dart:math' as math;
+ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flame/game.dart';
@@ -75,8 +75,15 @@ class WaterGame extends FlameGame {
   @override
   void render(ui.Canvas canvas) {
     super.render(canvas);
-    GridPainter.draw(canvas, ui.Size(size.x, size.y), state, cam,
-        blitter.image, tracedActive, hover);
+    GridPainter.draw(
+      canvas,
+      ui.Size(size.x, size.y),
+      state,
+      cam,
+      blitter.image,
+      tracedActive,
+      hover,
+    );
   }
 
   // ---- Raw pointer routing (from the Listener wrapper) ----
@@ -107,7 +114,14 @@ class WaterGame extends FlameGame {
     if (buttons & 4 == 0) _midDown = false;
   }
 
-  void scroll(double x, double y, double dy) {
+  void scroll(double x, double y, double dx, double dy) {
+    // While the middle button is held, Windows delivers the drag as
+    // WM_MOUSEWHEEL (the OS auto-scroll feature), not as mouse moves —
+    // so the drag arrives here: pan by both axes.
+    if (_midDown) {
+      cam.pan(dx, dy);
+      return;
+    }
     // ~120 logical px per mouse wheel notch: one notch = x1.1;
     // trackpads send small continuous deltas and zoom smoothly.
     final factor = math.pow(1.1, -dy / 120).toDouble();
@@ -116,10 +130,7 @@ class WaterGame extends FlameGame {
 
   void _setHover(double x, double y) {
     final (cx, cy) = cam.screenToCell(x, y);
-    hover = cx >= 0 &&
-            cy >= 0 &&
-            cx < Constants.gridW &&
-            cy < Constants.gridH
+    hover = cx >= 0 && cy >= 0 && cx < Constants.gridW && cy < Constants.gridH
         ? (cx, cy)
         : (-1, -1);
   }
@@ -148,15 +159,22 @@ class FieldBlitter {
     final h = Constants.gridH;
     final raw = field.rgbaPixels();
     final im = img.Image.fromBytes(
-        width: w, height: h, bytes: raw.buffer, format: img.Format.uint8, numChannels: 4);
+      width: w,
+      height: h,
+      bytes: raw.buffer,
+      format: img.Format.uint8,
+      numChannels: 4,
+    );
     final png = img.encodePng(im);
-    ui.instantiateImageCodec(png)
+    ui
+        .instantiateImageCodec(png)
         .then((codec) => codec.getNextFrame())
         .then((f) {
-      image = f.image;
-      _pending = false;
-    }).catchError((Object _) {
-      _pending = false;
-    });
+          image = f.image;
+          _pending = false;
+        })
+        .catchError((Object _) {
+          _pending = false;
+        });
   }
 }

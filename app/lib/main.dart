@@ -88,15 +88,25 @@ class _WaterAppState extends State<WaterApp> {
                 onPointerDown: (e) {
                   _gameFocus.requestFocus();
                   widget.game.pointerDown(
-                      e.position.dx, e.position.dy, e.buttons);
+                    e.position.dx,
+                    e.position.dy,
+                    e.buttons,
+                  );
                 },
-                onPointerMove: (e) =>
-                    widget.game.pointerMove(e.position.dx, e.position.dy, e.buttons),
+                onPointerMove: (e) => widget.game.pointerMove(
+                  e.position.dx,
+                  e.position.dy,
+                  e.buttons,
+                ),
                 onPointerUp: (e) => widget.game.pointerUp(e.buttons),
                 onPointerSignal: (e) {
                   if (e is PointerScrollEvent) {
                     widget.game.scroll(
-                        e.position.dx, e.position.dy, e.scrollDelta.dy);
+                      e.position.dx,
+                      e.position.dy,
+                      e.scrollDelta.dx,
+                      e.scrollDelta.dy,
+                    );
                   }
                 },
                 child: GameWidget(game: widget.game),
