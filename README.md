@@ -142,6 +142,15 @@ camera fit, wheel zoom and middle/right-button pan, seed/reset rebuilds,
 speed propagation, the traced-view fallback, and the tool keys. Verified
 in the running app on Windows: `cd app && flutter run -d windows`.
 
+**Fix (2026-09-22).** The tracer's ray march was a one-cell-diagonal
+staircase, not the straight ray to the light: on shallow rays it ran a row
+above the true line, so a sky cell whose line to a low sun slips past
+under the roof was blocked, and the whole open sky beside the tower
+rendered black in the GUI. The march is now a proper grid DDA (Amanatides
+& Woo) over the exact line; the shadow of the tower under a low sun is a
+clean diagonal from its top corner, matching the screenshot.
+
+
 **Phase 5 is complete and committed.** The traced view is a progressive
 light field, 1:1 with the 220×240 grid, in pure Dart (`lib/trace/`, zero
 Flutter imports). Every cell carries a running mean of its exact

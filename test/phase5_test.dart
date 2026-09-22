@@ -166,16 +166,18 @@ void main() {
     }
     expect(maxDelta, lessThan(1e-12));
 
-    // Local edit: the partition cell the lamp's ray to (202, 230) crosses
-    // turns to glass. Only its margin box re-converges immediately; every
-    // other cell keeps its value bit-identically (no global re-sweep, no
-    // black flash).
+    // Local edit: the partition cells the lamp's ray to (202, 230) can
+    // cross turn to glass (the straight line crosses at (195, 229); the
+    // cell below is included so the dirty boxes cover both). Only their
+    // margin boxes re-converge immediately; every other cell keeps its
+    // value bit-identically (no global re-sweep, no black flash).
+    w.set(195, 229, Material.glass);
     w.set(195, 230, Material.glass);
     run(t, w, _sunOff, 1);
     final inBox = (int i) {
       final x = i % t.field.w;
       final y = i ~/ t.field.w;
-      return x >= 193 && x <= 197 && y >= 228 && y <= 232;
+      return x >= 193 && x <= 197 && y >= 227 && y <= 232;
     };
     var outsideDelta = 0.0;
     for (var i = 0; i < n; i++) {

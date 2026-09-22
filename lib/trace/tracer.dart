@@ -347,27 +347,49 @@ class Tracer {
   double _slope(double x, double tSec) =>
       Waves.surface(x + 0.5, tSec) - Waves.surface(x - 0.5, tSec);
 
-  /// March from (cx, cy) toward the light at (lx, ly) one cell at a time.
-  /// Returns (tr, tg, tb, visible): false for visible when a light-blocking
-  /// cell is crossed (transmittances are then meaningless); otherwise the
-  /// per-cell transmittances of every glass/water cell traversed (the start
-  /// cell and the light cell itself are not attenuated; out-of-grid cells
-  /// are sky and terminate the march unattenuated).
+  /// March from cell (cx, cy) toward the light at (lx, ly) along the
+  /// straight line between the two cell centres. Returns (tr, tg, tb,
+  /// visible): false for visible when a light-blocking cell is crossed
+  /// (transmittances are then meaningless); otherwise the per-cell
+  /// transmittances of every glass/water cell traversed (the start cell
+  /// and the light cell itself are not attenuated; out-of-grid cells are
+  /// sky and terminate the march unattenuated).
+  ///
+  /// The march is a DDA over the integer grid (Amanatides & Woo): each
+  /// step advances to the next cell the line crosses, exactly one cell
+  /// per grid boundary the line passes. (An earlier version moved one
+  /// cell diagonally per step; on shallow rays that staircase ran up to
+  /// a row above the true line, so a sky cell whose straight line to the
+  /// sun slips past under the roof was blocked, and the whole open sky
+  /// beside the tower went black.)
   (double, double, double, bool) _march(
       int cx, int cy, double lx, double ly, World w, Water water) {
     var tr = 1.0;
     var tg = 1.0;
     var tb = 1.0;
+    final dx = lx - cx;
+    final dy = ly - cy;
+    if ((cx - lx).abs() <= 1 && (cy - ly).abs() <= 1) return (1, 1, 1, true);
+    // Ray P(t) = (cx + dx*t, cy + dy*t), t in [0, 1], from the start cell's
+    // centre. The line crosses the first vertical grid line (half a cell
+    // from the centre) at t = 0.5/|dx|, then every 1/|dx| after (horizontal:
+    // 0.5/|dy|, 1/|dy|).
+    final tDeltaX = dx.abs() > 0 ? 1.0 / dx.abs() : double.infinity;
+    final tDeltaY = dy.abs() > 0 ? 1.0 / dy.abs() : double.infinity;
+    var tMaxX = tDeltaX / 2;
+    var tMaxY = tDeltaY / 2;
     var x = cx;
     var y = cy;
-    for (var step = 0; step < 512; step++) {
-      final rx = x - lx;
-      final ry = y - ly;
-      if (rx.abs() <= 1 && ry.abs() <= 1) return (tr, tg, tb, true);
-      if (rx.abs() > ry.abs()) {
-        x += rx > 0 ? -1 : 1;
+    for (var step = 0; step < 1024; step++) {
+      if (tMaxX <= tMaxY) {
+        x += (dx < 0 ? -1 : 1);
+        tMaxX += tDeltaX;
       } else {
-        y += ry > 0 ? -1 : 1;
+        y += (dy < 0 ? -1 : 1);
+        tMaxY += tDeltaY;
+      }
+      if ((x - lx).abs() <= 1 && (y - ly).abs() <= 1) {
+        return (tr, tg, tb, true); // reached the light
       }
       if (x < 0 || x >= _w || y < 0 || y >= _h) {
         return (tr, tg, tb, true); // the rest of the path is sky
