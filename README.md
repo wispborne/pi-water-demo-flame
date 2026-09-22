@@ -156,6 +156,11 @@ dark theme, so `Text` defaulted to near-black on the dark panels. The
 cyan accent for the sliders and dropdown), and the counters, hover readout,
 buttons, seed field, and key hints are legible in the running app.
 
+**Change (2026-09-22).** The tower was too narrow. A bay is now 8 cells
+wide, not 4, so the default tower (6 bays, not 3) is 50 columns wide, not
+14, and the width setting and its slider run 1–10, not 1–5. The pool and
+everything else keep their seeded layout rules.
+
 
 **Phase 5 is complete and committed.** The traced view is a progressive
 light field, 1:1 with the 220×240 grid, in pure Dart (`lib/trace/`, zero
