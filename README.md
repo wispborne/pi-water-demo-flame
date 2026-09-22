@@ -77,16 +77,16 @@ is a pure-Dart package — headless-testable on any box; the GUI is the
   - `camera.dart` — fit the whole world, pan, wheel zoom around the cursor
     (pure Dart).
   - `game/water_game.dart` — the Flame layer: game loop, pointer routing
-    (left = tool, right = pan, wheel = zoom), the `FieldBlitter` (light
-    field → `ui.Image` via a pure-Dart PNG encode, decoded on a codec
-    thread).
+    (left = tool, right/middle = pan, wheel = zoom), the `FieldBlitter`
+    (light field → `ui.Image` via a pure-Dart PNG encode, decoded on a
+    codec thread).
   - `render/grid_painter.dart` — one painter per frame: plain mode (sky,
     cells batched per material, depth tint, wavy surface line, glow band,
     sun) and traced mode (the blitted field, then bulbs, sun disc, surface
     line and glow band on top; the scene is lit only by the traced light).
   - `ui/hud.dart` — the 10 Hz overlay: counters, hover readout, controls,
     sliders.
-  - `test/widget_test.dart` — the 11 GUI contract tests.
+  - `test/widget_test.dart` — the 13 GUI contract tests.
 
 ## Run
 
@@ -105,7 +105,7 @@ The GUI (Phase 6) is the `app/` Flutter package, run separately:
 cd app
 flutter pub get
 flutter run -d windows
-flutter test       # the 11 GUI contract tests
+flutter test       # the 13 GUI contract tests
 ```
 
 Or, on Windows, just double-click `run.bat` (it builds the release on the
@@ -128,18 +128,19 @@ commit. Decisions are in `PLAN.md`; the design context in `CONTEXT.md`.
 **Phase 6 is complete and committed.** The GUI is a Flutter/Flame desktop
 app (`app/`) over the pure-Dart core. The camera fits the whole world at
 load and after Reset / New seed; left-drag applies the selected tool,
-right-drag pans, and the wheel zooms around the cursor. The traced view is
-on by default: the 220×240 light field is blitted each frame and the scene
-is lit only by that field; a sustained ray-budget overrun drops to the
-plain view and re-enables on recovery. The HUD (10 Hz) shows the counters
+right- or middle-drag pans, and the wheel zooms around the cursor. The
+traced view is on by default: the 220×240 light field is blitted each
+frame and the scene is lit only by that field; a sustained ray-budget
+overrun drops to the plain view and re-enables on recovery. The HUD (10
+Hz) shows the counters
 (water cells, damage %, destroyed cells, FPS), the hover readout
 (material, strength, pressure, light swatch), the controls (Pause, Speed,
 Reset, New seed, Glow, Path trace), and the sliders (brush, rain, floors,
 width, structure) with a seed-name field; tapping a control returns
-keyboard focus to the game. The 11 `flutter test` contract tests cover the
-camera fit, seed/reset rebuilds, speed propagation, the traced-view
-fallback, and the tool keys. Verified in the running app on Windows:
-`cd app && flutter run -d windows`.
+keyboard focus to the game. The 13 `flutter test` contract tests cover the
+camera fit, wheel zoom and middle/right-button pan, seed/reset rebuilds,
+speed propagation, the traced-view fallback, and the tool keys. Verified
+in the running app on Windows: `cd app && flutter run -d windows`.
 
 **Phase 5 is complete and committed.** The traced view is a progressive
 light field, 1:1 with the 220×240 grid, in pure Dart (`lib/trace/`, zero
