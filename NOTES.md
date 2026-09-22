@@ -26,6 +26,18 @@ Hard-won, tooling-specific lessons. Keep terse.
   PNG shows the app window before trusting it.
 - Run: `powershell -NoProfile -ExecutionPolicy Bypass -File out/_shot.ps1`.
 
+## Batch files (cmd)
+
+- **CRLF line endings are required.** `write` emits LF; a multi-line
+  `if (...)` block in an LF-only `.bat` mis-parses and the script dies
+  silently at `pause`. Convert with `sed -i 's/$/\r/' run.bat` after
+  writing.
+- **No unbalanced parentheses in text inside `(...)` blocks.** An echo
+  line containing `(` or `)` (even inside a word like `app\`) closes the
+  block early. Keep block text paren-free.
+- Test with `cmd /c path\to\run.bat`, and confirm the launched process
+  with `tasklist | findstr`.
+
 
 ## `dart test` hangs and zombies
 

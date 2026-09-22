@@ -108,6 +108,9 @@ flutter run -d windows
 flutter test       # the 11 GUI contract tests
 ```
 
+Or, on Windows, just double-click `run.bat` (it builds the release on the
+first run, then launches the app).
+
 ## Status
 
 Phases are defined in `PHASES.md`; each ends in a green `dart test` run and a
