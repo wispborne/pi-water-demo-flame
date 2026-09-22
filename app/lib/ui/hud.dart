@@ -205,7 +205,7 @@ class _HudOverlayState extends State<HudOverlay> {
                   _slider('floors', 1, 50, s.settings.floors.toDouble(),
                       (v) => _applySettings(v.round(), null, null)),
                   const SizedBox(width: 12),
-                  _slider('width', 1, 5, s.settings.width.toDouble(),
+                  _slider('width', 1, 10, s.settings.width.toDouble(),
                       (v) => _applySettings(null, v.round(), null)),
                   const SizedBox(width: 12),
                   SizedBox(

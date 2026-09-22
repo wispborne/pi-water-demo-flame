@@ -46,7 +46,7 @@ void main() {
       expect(() => Settings.validate(floors: 0), throwsArgumentError);
       expect(() => Settings.validate(floors: 51), throwsArgumentError);
       expect(() => Settings.validate(width: 0), throwsArgumentError);
-      expect(() => Settings.validate(width: 6), throwsArgumentError);
+      expect(() => Settings.validate(width: 11), throwsArgumentError);
       expect(() => Settings.validate(material: 'brick'), throwsArgumentError);
     });
   });

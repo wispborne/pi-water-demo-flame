@@ -30,7 +30,7 @@ good at; the world itself is one canvas, not a component forest.
   hover readout, controls, sliders.
 
 ### The grid (the core)
-- **One `CustomPainter` per frame**, not one component per cell. 30 floors × 5
+- **One `CustomPainter` per frame**, not one component per cell. 30 floors × 10
   bays is at most a few thousand visible cells; 10k Flame components would be a
   perf disaster. The painter iterates the grid and batches fill-rects per
   material; water surface is a wavy line (slow swell + two faster short waves).
@@ -217,7 +217,7 @@ single-key tower blast.)
 
 ## Decisions (resolved)
 1. **Grid: 220 × 240 cells (W × H).** Floor height 4 cells (1 slab + 3 interior),
-   bay 4 cells wide → max tower 50 × 4 = 200 cells. Ground surface level seeded
+   bay 8 cells wide. Ground surface level seeded
    12–28 cells above the bottom; sky margin ≥ 12 cells. Rain distributes
    uniformly across the full 220 width. (The earlier ~180×100 estimate cannot
    fit a 50-floor tower at 4 cells/floor.)

@@ -46,7 +46,7 @@ One level of a generated tower, divided into 1–3 rooms.
 A portion of a floor; has 2–5 furniture items and 1–3 lamps.
 
 **Bay**:
-One unit of tower width (1–5).
+One unit of tower width (1–10).
 
 **Furniture**:
 A loose indoor object, one of ten types: sofa, bed, desk, chair, table, counter, fridge, tub, plant, TV. Transparent to water and to light; each type has a fixed footprint and a buoyancy.

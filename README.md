@@ -17,10 +17,10 @@ is a pure-Dart package — headless-testable on any box; the GUI is the
 ## Layout
 
 - `lib/core/` — the pure-Dart simulation core (no Flutter import):
-  - `constants.dart` — grid 220×240; floor 4 cells, bay 4 cells; timings.
+  - `constants.dart` — grid 220×240; floor 4 cells, bay 8 cells; timings.
   - `rng.dart` — FNV-1a-64 seed hash → PCG32; forked sub-streams per world
     section. Deterministic; integer-only; no `dart:math.Random` (ADR 0001).
-  - `settings.dart` — world settings (floors 1–50, width 1–5, structure
+  - `settings.dart` — world settings (floors 1–50, width 1–10, structure
     material) with validation.
   - `materials.dart` — material enum + property table (tolerance/hp/buoyancy).
   - `world.dart` — the cell-grid container (cell access, water/structural

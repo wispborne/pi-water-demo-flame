@@ -7,8 +7,8 @@ class Constants {
   /// One floor = 1 slab row + 3 interior rows.
   static const int floorHeight = 4;
 
-  /// One bay = 4 cells wide (interior span only; outer walls add 1 per side).
-  static const int bayWidth = 4;
+  /// One bay = 8 cells wide (interior span only; outer walls add 1 per side).
+  static const int bayWidth = 8;
 
   /// Ground surface is seeded 12..28 cells above the bottom row.
   static const int groundLevelMin = 12;
@@ -55,5 +55,5 @@ class Constants {
   static const int floorsMin = 1;
   static const int floorsMax = 50;
   static const int widthMin = 1;
-  static const int widthMax = 5;
+  static const int widthMax = 10;
 }

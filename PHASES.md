@@ -27,7 +27,7 @@ settings. Nothing animates yet; the world is a static, correct structure.
 - Scaffold the root pure-Dart package (`pubspec.yaml`, `lib/`, `test/`).
 - `core/rng.dart` — FNV-1a-64 seed hash → PCG32 (pure Dart, integer-only);
   forked sub-streams per world section (ADR 0001). No `math.random`.
-- `core/constants.dart` — grid 220×240; floor 4 cells, bay 4 cells; ground
+- `core/constants.dart` — grid 220×240; floor 4 cells, bay 8 cells; ground
   surface 12–28; material table (tolerance/hp/buoyancy, decision 6); timings.
 - `core/materials.dart` — material enum + properties.
 - `core/world.dart` — grid container, cell access, water-body bookkeeping.

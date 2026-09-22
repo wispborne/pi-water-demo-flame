@@ -16,7 +16,7 @@ Terminology follows `CONTEXT.md`; decisions of record live in `docs/adr/`.
 
 ## 2. Tower generation
 
-- Generated from a **seed** (any text or number) plus three settings: **floors** (1–50, default 30), **width in bays** (1–5, default 3), **structure material** (four tiers of increasing strength — concrete, reinforced concrete, steel, titanium; default reinforced concrete).
+- Generated from a **seed** (any text or number) plus three settings: **floors** (1–50, default 30), **width in bays** (1–10, default 6), **structure material** (four tiers of increasing strength — concrete, reinforced concrete, steel, titanium; default reinforced concrete).
 - **Rooms**: every floor is divided into 1–3 rooms (count seeded per floor). Rooms are contiguous segments of the floor's bays; the partition among valid splits is seeded. Partition walls are 1 cell thick, in the structure material.
 - Each room gets a random **non-overlapping mix** of **2–5 furniture items** and **1–3 lamps**. Non-overlapping means: at most one of each type per room, and no two items share a cell.
 - **Furniture** (ten types, each with a fixed footprint in cells and a fixed buoyancy):

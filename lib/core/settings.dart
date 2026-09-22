@@ -3,12 +3,12 @@ import 'constants.dart';
 /// The three generation settings (SPEC section 2).
 class Settings {
   final int floors; // 1..50, default 30
-  final int width; // bays 1..5, default 3
+  final int width; // bays 1..10, default 6
   final String material; // concrete | rebar | steel | titanium, default rebar
 
   const Settings({
     this.floors = 30,
-    this.width = 3,
+    this.width = 6,
     this.material = 'rebar',
   });
 
