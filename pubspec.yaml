@@ -2,6 +2,6 @@ name: water_tower
 description: 30 Floors & a Pool — seeded cell-grid water simulation with a traced light field. Pure Dart core; Flutter/Flame app in app/.
 version: 0.1.0
 environment:
-  sdk: ^3.13.0
+  sdk: ^3.12.0
 dev_dependencies:
   test: ^1.26.0

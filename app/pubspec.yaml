@@ -1,0 +1,23 @@
+name: water_tower_app
+description: 30 Floors & a Pool - the Flutter/Flame desktop GUI (Phase 6).
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flame: ^1.33.0
+  image: ^4.5.0
+  water_tower:
+    path: ../
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
