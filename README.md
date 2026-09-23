@@ -86,7 +86,7 @@ is a pure-Dart package — headless-testable on any box; the GUI is the
     line and glow band on top; the scene is lit only by the traced light).
   - `ui/hud.dart` — the 10 Hz overlay: counters, hover readout, controls,
     sliders.
-  - `test/widget_test.dart` — the 14 GUI contract tests.
+  - `test/widget_test.dart` — the 15 GUI contract tests.
 
 ## Run
 
@@ -106,7 +106,7 @@ cd app
 flutter pub get
 flutter run -d windows
 flutter run -d macos
-flutter test       # the 14 GUI contract tests
+flutter test       # the 15 GUI contract tests
 ```
 
 Or, on Windows, just double-click `run.bat` (it builds the release on the
@@ -139,14 +139,24 @@ Hz) shows the counters
 (material, strength, pressure, light swatch), the controls (Pause, Speed,
 Reset, New seed, Glow, Path trace), and the sliders (brush, rain, floors,
 width, structure) with a seed-name field; tapping a control returns
-keyboard focus to the game. The 14 `flutter test` contract tests cover the
+keyboard focus to the game. The 15 `flutter test` contract tests cover the
 camera fit, wheel zoom and middle/right-button pan, seed/reset rebuilds,
 speed propagation, the traced-view fallback, the tool keys, and the
 hover readout's SPEC 10 strength bar. Verified
 in the running app on Windows: `cd app && flutter run -d windows`.
 macOS desktop support was added on 2026-09-23 (`app/macos/` via
 `flutter create --platforms=macos`, org `com.water_tower`); the app builds
-and runs there with the same 14/14 `flutter test` pass.
+and runs there with the same 15/15 `flutter test` pass.
+
+**Fix (2026-09-23).** The hover readout only followed the cursor while a
+button was held: in Flutter a button-less mouse move is delivered as a
+`PointerHoverEvent`, not a `PointerMoveEvent`, and the app's `Listener`
+wired only `onPointerMove` — so the readout (and the crosshair) tracked a
+pressed drag, i.e. a "selected" tile, on every platform. The `Listener`
+now also forwards `onPointerHover`, so the readout shows the hovered tile
+with no click, on Windows and macOS alike. A 15th GUI contract test drives
+a real button-less mouse gesture through the widget tree and fails without
+the fix.
 
 **Fix (2026-09-22).** The hover readout was missing the SPEC 10
 colour-coded strength bar: `_hoverPanel` showed `HP x/y` as text only. It

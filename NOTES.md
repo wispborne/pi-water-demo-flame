@@ -107,6 +107,12 @@ Hard-won, tooling-specific lessons. Keep terse.
   moves route to the down target), release (`0x0004`). Use a **debug**
   build (`flutter build windows --debug`) when VM-service inspection is
   needed: the release exe has no VM service.
+- **Flutter splits mouse moves by button state (2026-09-23):** a move with
+  no button down is a `PointerHoverEvent`, not a `PointerMoveEvent` — a
+  `Listener` must wire `onPointerHover` to track plain hover. This was the
+  "readout needs a click" bug; the app's `Listener` (main.dart) now wires
+  both. Real-mouse hover works; the `SetCursorPos` caveat above stands
+  (the OS sends no event at all for a teleported cursor).
 
 
 ## `dart test` hangs and zombies

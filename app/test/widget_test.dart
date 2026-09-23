@@ -250,4 +250,50 @@ void main() {
     expect(shrunken.width, closeTo(60 * hp / maxHp, 0.5));
     game.dispose();
   });
+
+  testWidgets('real mouse hover (no click) updates the readout',
+      (tester) async {
+    final state = SimState('seed-42');
+    final game = WaterGame(state);
+    state.paused = true; // freeze the sim so the hovered cell is stable
+    await tester.pumpWidget(WaterApp(state: state, game: game));
+    await tester.pump();
+
+    // Find an undamaged structural cell whose screen position is clear of
+    // the HUD panels (the top-left readout and the bottom bar swallow
+    // pointer events over their area).
+    int cx = -1, cy = -1;
+    outer:
+    for (var y = 0; y < Constants.gridH; y++) {
+      for (var x = 0; x < Constants.gridW; x++) {
+        final m = state.world.at(x, y);
+        if (core.Materials.structure.contains(m) &&
+            state.world.strength[state.world.idx(x, y)] ==
+                core.Materials.of(m).hp) {
+          final sx = game.cam.offX + (x + 0.5) * game.cam.cellPx;
+          final sy = game.cam.offY + (y + 0.5) * game.cam.cellPx;
+          if (sx < 300 || sy < 100 || sy > 440) continue;
+          cx = x;
+          cy = y;
+          break outer;
+        }
+      }
+    }
+    expect(cx, greaterThanOrEqualTo(0));
+
+    // A button-less mouse move is delivered as a PointerHoverEvent, not a
+    // PointerMoveEvent; drive it through the real Listener in main.dart.
+    // Regression: onPointerMove alone only fired while a button was held.
+    final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await gesture.addPointer();
+    await gesture.moveTo(
+      Offset(
+        game.cam.offX + (cx + 0.5) * game.cam.cellPx,
+        game.cam.offY + (cy + 0.5) * game.cam.cellPx,
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(find.byKey(const ValueKey('strength-bar')), findsOneWidget);
+    game.dispose();
+  });
 }
