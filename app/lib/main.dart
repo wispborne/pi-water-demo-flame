@@ -124,6 +124,16 @@ class _WaterAppState extends State<WaterApp> {
                       e.scrollDelta.dy,
                     );
                   }
+                  // Trackpad pinch/zoom is not a scroll: the platform
+                  // delivers it as a PointerScaleEvent with a
+                  // multiplicative scale (wheel zoom is a scroll delta).
+                  else if (e is PointerScaleEvent) {
+                    widget.game.scale(
+                      e.position.dx,
+                      e.position.dy,
+                      e.scale,
+                    );
+                  }
                 },
                 child: GameWidget(game: widget.game),
               ),

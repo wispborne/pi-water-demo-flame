@@ -128,6 +128,12 @@ class WaterGame extends FlameGame {
     cam.zoomAt(x, y, factor);
   }
 
+  void scale(double x, double y, double factor) {
+    // Trackpad pinch/zoom (macOS et al.) arrives as a PointerScaleEvent
+    // whose scale is already the per-event zoom factor.
+    if (factor.isFinite && factor > 0) cam.zoomAt(x, y, factor);
+  }
+
   void _setHover(double x, double y) {
     final (cx, cy) = cam.screenToCell(x, y);
     hover = cx >= 0 && cy >= 0 && cx < Constants.gridW && cy < Constants.gridH

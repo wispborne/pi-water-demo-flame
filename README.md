@@ -130,7 +130,8 @@ commit. Decisions are in `PLAN.md`; the design context in `CONTEXT.md`.
 **Phase 6 is complete and committed.** The GUI is a Flutter/Flame desktop
 app (`app/`) over the pure-Dart core. The camera fits the whole world at
 load and after Reset / New seed; left-drag applies the selected tool,
-right- or middle-drag pans, and the wheel zooms around the cursor. The
+right- or middle-drag pans, and the wheel and trackpad pinch zoom around
+the cursor. The
 traced view is on by default: the 220×240 light field is blitted each
 frame and the scene is lit only by that field; a sustained ray-budget
 overrun drops to the plain view and re-enables on recovery. The HUD (10
@@ -139,14 +140,24 @@ Hz) shows the counters
 (material, strength, pressure, light swatch), the controls (Pause, Speed,
 Reset, New seed, Glow, Path trace), and the sliders (brush, rain, floors,
 width, structure) with a seed-name field; tapping a control returns
-keyboard focus to the game. The 15 `flutter test` contract tests cover the
-camera fit, wheel zoom and middle/right-button pan, seed/reset rebuilds,
+keyboard focus to the game. The 16 `flutter test` contract tests cover the
+camera fit, wheel and pinch zoom and middle/right-button pan, seed/reset rebuilds,
 speed propagation, the traced-view fallback, the tool keys, and the
 hover readout's SPEC 10 strength bar. Verified
 in the running app on Windows: `cd app && flutter run -d windows`.
 macOS desktop support was added on 2026-09-23 (`app/macos/` via
 `flutter create --platforms=macos`, org `com.water_tower`); the app builds
 and runs there with the same 15/15 `flutter test` pass.
+
+**Fix (2026-09-23).** Trackpad pinch zoom did nothing on macOS: Flutter
+delivers a two-finger pinch as a `PointerScaleEvent` carrying a
+multiplicative `scale`, not as a `PointerScrollEvent` with a scroll delta,
+and the app's `Listener` forwarded only the scroll events — so the pinch
+was silently dropped while mouse-wheel zoom kept working. The listener now
+forwards `PointerScaleEvent` too, and `WaterGame.scale` applies its factor
+through `cam.zoomAt` (zooming around the cursor, clamped as before). A 16th
+GUI contract test drives a `PointerScaleEvent` through the widget tree and
+fails without the fix.
 
 **Fix (2026-09-23).** The hover readout only followed the cursor while a
 button was held: in Flutter a button-less mouse move is delivered as a

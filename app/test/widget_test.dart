@@ -188,6 +188,38 @@ void main() {
     game.dispose();
   });
 
+  testWidgets('trackpad pinch over the canvas zooms at the cursor',
+      (tester) async {
+    final state = SimState('seed-42');
+    final game = WaterGame(state);
+    await tester.pumpWidget(WaterApp(state: state, game: game));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    final before = (game.cam.cellPx, game.cam.offX, game.cam.offY);
+    final center = Offset(400, 300);
+    // A trackpad pinch/zoom arrives as a PointerScaleEvent with a
+    // multiplicative scale, not a PointerScrollEvent (regression:
+    // pinch zoom was silently dropped).
+    final signal = PointerScaleEvent(
+      position: center,
+      scale: 1.25,
+      kind: PointerDeviceKind.trackpad,
+    );
+    final listener = tester.allRenderObjects
+        .whereType<RenderPointerListener>()
+        .firstWhere((l) => l.onPointerSignal != null);
+    listener.onPointerSignal?.call(signal);
+    await tester.pump();
+    expect(game.cam.cellPx, closeTo(before.$1 * 1.25, 1e-9));
+    final wx0 = (center.dx - before.$2) / before.$1;
+    final wy0 = (center.dy - before.$3) / before.$1;
+    final wx1 = (center.dx - game.cam.offX) / game.cam.cellPx;
+    final wy1 = (center.dy - game.cam.offY) / game.cam.cellPx;
+    expect(wx1, closeTo(wx0, 1e-9));
+    expect(wy1, closeTo(wy0, 1e-9));
+    game.dispose();
+  });
+
   testWidgets('app builds: the HUD shows the counters and controls',
       (tester) async {
     final state = SimState('seed-42');
