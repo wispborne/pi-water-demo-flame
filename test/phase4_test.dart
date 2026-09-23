@@ -109,22 +109,27 @@ void main() {
   });
 
   group('rain', () {
-    test('rain spawns water on the top row, uniform left to right', () {
+    test('rain spawns water on the top row, spread across the full width',
+        () {
       final w = bare();
       final tools = Tools()..rain = 30;
       for (var i = 0; i < 10; i++) {
         tools.rainTick(w, 0.1); // 10 x 0.1 s = 1 sim-second = 30 drops
       }
-      var top = 0;
-      for (var x = 0; x < Constants.gridW; x++) {
-        if (w.at(x, 0) == Material.water) top++;
-      }
-      expect(top, 30); // every drop is on the top row...
-      for (var x = 0; x < 30; x++) {
-        expect(w.at(x, 0), Material.water); // ...left to right
-      }
-      expect(w.at(30, 0), Material.air);
-      expect(w.at(100, 0), Material.air); // not scattered mid-row
+      final cols = [
+        for (var x = 0; x < Constants.gridW; x++)
+          if (w.at(x, 0) == Material.water) x,
+      ];
+      expect(cols.length, 30); // every drop is on the top row...
+      expect(cols.toSet().length, 30); // ...one per column (30 distinct)
+      // ...and it falls from the whole sky, not a left-to-right front:
+      // the seeded run spans columns 2..208 with both halves covered.
+      expect(cols.first, 2);
+      expect(cols.last, 208);
+      final half = Constants.gridW ~/ 2;
+      expect(cols.where((x) => x < half).length, greaterThan(0));
+      expect(cols.where((x) => x >= half).length, greaterThan(0));
+      expect(w.at(0, 0), Material.air); // no left-edge block of rain
     });
 
     test('rain at N spawns N water cells per sim-second (1x, 2x, 0.5x)', () {

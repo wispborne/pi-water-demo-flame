@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'constants.dart';
 import 'materials.dart';
 import 'world.dart';
@@ -42,10 +44,9 @@ class Tools {
   /// 0.2 at 1x, 0.1 at 2x, 0.4 at 0.5x).
   double _carry = 0;
 
-  /// Running drop counter: each spawned drop is the next one in a global
-  /// left-to-right walk of the top row (wrapping), so the rain is uniform
-  /// across the full width no matter how the drops split across ticks.
-  int _drop = 0;
+  /// Column chooser for the top row. Fixed seed: the rain sequence must be
+  /// deterministic across runs (the snapshot-equality tests depend on it).
+  final _rng = Random(24318);
 
   /// Select a tool by key 1..8 (SPEC 8). Returns false (and selects
   /// nothing) for an out-of-range key.
@@ -81,8 +82,10 @@ class Tools {
   /// exactly half as much — the spawn count is the deterministic function
   /// of time the contract requires.
   ///
-  /// A column whose top cell is occupied (a tall tower) defers its drop to
-  /// the next tick; its cells are not lost (volume: rain is the only
+  /// Each drop takes an independent random column, so the rain falls from
+  /// the whole sky at once (no left-to-right sweep). A column whose top
+  /// cell is occupied (a tall tower) defers its drop to the next tick and
+  /// re-draws a column; its cell is not lost (volume: rain is the only
   /// creation besides erosion).
   void rainTick(World w, double stepSec) {
     if (rain <= 0) {
@@ -95,16 +98,15 @@ class Tools {
     _carry -= n;
     final W = Constants.gridW;
     for (var i = 0; i < n; i++) {
-      // The next drop in the global left-to-right walk (wrapping) — the
-      // uniform distribution across the full grid width (SPEC 4).
-      final x = _drop % W;
+      // A random column: the uniform distribution across the full grid
+      // width (SPEC 4), with no directional front.
+      final x = _rng.nextInt(W);
       if (w.at(x, 0) != Material.air) {
-        // Deferred: this tick's column is full at the top; the same drop
-        // is retried next tick (its column is not consumed).
+        // Deferred: this column is full at the top; the drop is retried
+        // next tick with a fresh column (its cell is not lost).
         _carry += 1;
         continue;
       }
-      _drop++;
       w.set(x, 0, Material.water);
     }
   }

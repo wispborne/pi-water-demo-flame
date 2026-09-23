@@ -43,7 +43,7 @@ is a pure-Dart package — headless-testable on any box; the GUI is the
     cycle, left-right arc, freezes when the world is paused).
   - `tools.dart` — the eight user tools (hammer, bomb, water, erase, four
     build materials) with a 1–15 cell brush, plus rain (0–40 water cells
-    per sim-second on the top row, uniform left to right).
+    per sim-second on the top row, in random columns across the full width).
 - `sim.dart` — the fixed-timestep driver: wall-clock time × speed scale
   (0.5/1/2, paused at 0) → physics ticks at 30/s; owns the sim clock, the
   sun, and the tools; water volume is conserved through it.
@@ -211,8 +211,9 @@ one strength per hit (structure breaks to rubble at 0, other materials to
 debris; ground is untouchable), the bomb deals decaying falloff damage
 (centre worst, radius edge one), water/erase paint, and the four build
 materials place their cell (ground never overwritable). Rain spawns
-0–40 water cells per sim-second on the top row, uniform left to right, and
-scales exactly with the speed scale. The sim driver is a fixed-timestep
+0–40 water cells per sim-second on the top row, in random columns across
+the full width, and scales exactly with the speed scale. The sim driver is a
+fixed-timestep
 accumulator: wall-clock time × speed scale (0.5/1/2, paused at 0) →
 30 physics ticks per sim-second, so 2x advances the sim state (sun, water,
 structure, tools) exactly twice as fast per wall second. See the artifact:
