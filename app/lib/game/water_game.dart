@@ -129,9 +129,32 @@ class WaterGame extends FlameGame {
   }
 
   void scale(double x, double y, double factor) {
-    // Trackpad pinch/zoom (macOS et al.) arrives as a PointerScaleEvent
-    // whose scale is already the per-event zoom factor.
+    // Embedders that report pinch as a scale signal send the per-event
+    // zoom factor directly.
     if (factor.isFinite && factor > 0) cam.zoomAt(x, y, factor);
+  }
+
+  double _panZoomScale = 1.0;
+
+  void panZoomStart() => _panZoomScale = 1.0;
+
+  void panZoomEnd() => _panZoomScale = 1.0;
+
+  void panZoomUpdate(
+    double x,
+    double y,
+    double panDx,
+    double panDy,
+    double scale,
+  ) {
+    // macOS trackpad pinch and two-finger pan: scale is the cumulative
+    // zoom since the gesture began, so apply the ratio to the last seen
+    // value; panDelta is the per-event pan.
+    if (scale.isFinite && scale > 0 && scale != _panZoomScale) {
+      cam.zoomAt(x, y, scale / _panZoomScale);
+      _panZoomScale = scale;
+    }
+    if (panDx != 0 || panDy != 0) cam.pan(panDx, panDy);
   }
 
   void _setHover(double x, double y) {

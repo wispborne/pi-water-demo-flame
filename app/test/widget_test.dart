@@ -188,7 +188,7 @@ void main() {
     game.dispose();
   });
 
-  testWidgets('trackpad pinch over the canvas zooms at the cursor',
+  testWidgets('trackpad pinch and two-finger pan drive the camera',
       (tester) async {
     final state = SimState('seed-42');
     final game = WaterGame(state);
@@ -197,18 +197,17 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     final before = (game.cam.cellPx, game.cam.offX, game.cam.offY);
     final center = Offset(400, 300);
-    // A trackpad pinch/zoom arrives as a PointerScaleEvent with a
-    // multiplicative scale, not a PointerScrollEvent (regression:
-    // pinch zoom was silently dropped).
-    final signal = PointerScaleEvent(
-      position: center,
-      scale: 1.25,
-      kind: PointerDeviceKind.trackpad,
-    );
+    // macOS delivers the trackpad pinch (and two-finger pan) as panZoom
+    // pointer changes, not signal events: scale is cumulative since the
+    // gesture began, panDelta is the per-event pan. Regression: the
+    // Listener wired neither, so pinch zoom was silently dropped.
+    final start = PointerPanZoomStartEvent(position: center);
+    final pinch = PointerPanZoomUpdateEvent(position: center, scale: 1.25);
     final listener = tester.allRenderObjects
         .whereType<RenderPointerListener>()
-        .firstWhere((l) => l.onPointerSignal != null);
-    listener.onPointerSignal?.call(signal);
+        .firstWhere((l) => l.onPointerPanZoomUpdate != null);
+    listener.onPointerPanZoomStart?.call(start);
+    listener.onPointerPanZoomUpdate?.call(pinch);
     await tester.pump();
     expect(game.cam.cellPx, closeTo(before.$1 * 1.25, 1e-9));
     final wx0 = (center.dx - before.$2) / before.$1;
@@ -217,6 +216,23 @@ void main() {
     final wy1 = (center.dy - game.cam.offY) / game.cam.cellPx;
     expect(wx1, closeTo(wx0, 1e-9));
     expect(wy1, closeTo(wy0, 1e-9));
+    // A later update carries a pan delta (two-finger pan) at the same
+    // cumulative scale: the camera pans, zoom is untouched.
+    final off = (game.cam.offX, game.cam.offY);
+    final pan = PointerPanZoomUpdateEvent(
+      position: center,
+      panDelta: const Offset(10, -6),
+      scale: 1.25,
+    );
+    listener.onPointerPanZoomUpdate?.call(pan);
+    listener.onPointerPanZoomEnd?.call(
+      PointerPanZoomEndEvent(position: center),
+    );
+    await tester.pump();
+    expect(game.cam.offX, closeTo(off.$1 + 10, 1e-9));
+    expect(game.cam.offY, closeTo(off.$2 - 6, 1e-9));
+    expect(game.cam.cellPx, closeTo(before.$1 * 1.25, 1e-9),
+        reason: 'pure pan does not zoom');
     game.dispose();
   });
 

@@ -149,15 +149,18 @@ macOS desktop support was added on 2026-09-23 (`app/macos/` via
 `flutter create --platforms=macos`, org `com.water_tower`); the app builds
 and runs there with the same 15/15 `flutter test` pass.
 
-**Fix (2026-09-23).** Trackpad pinch zoom did nothing on macOS: Flutter
-delivers a two-finger pinch as a `PointerScaleEvent` carrying a
-multiplicative `scale`, not as a `PointerScrollEvent` with a scroll delta,
-and the app's `Listener` forwarded only the scroll events — so the pinch
-was silently dropped while mouse-wheel zoom kept working. The listener now
-forwards `PointerScaleEvent` too, and `WaterGame.scale` applies its factor
-through `cam.zoomAt` (zooming around the cursor, clamped as before). A 16th
-GUI contract test drives a `PointerScaleEvent` through the widget tree and
-fails without the fix.
+**Fix (2026-09-23).** Trackpad pinch zoom and two-finger pan did nothing
+on macOS: the macOS embedder delivers *both* as `panZoomStart/Update/End`
+pointer changes (with a cumulative `scale` and a per-event `panDelta`),
+not as scroll/scale signal events — only the physical mouse wheel arrives
+as a `PointerScrollEvent`. The app's `Listener` wired neither the panZoom
+callbacks nor anything that matches them, so trackpad input was silently
+dropped while wheel zoom kept working. The `Listener` now forwards
+`onPointerPanZoomStart/Update/End`, and `WaterGame.panZoomUpdate` applies
+the scale ratio (cumulative → per-event) through `cam.zoomAt` at the
+gesture position and the pan delta through `cam.pan`. A 16th GUI contract
+test drives a panZoom start/update/end sequence through the widget tree
+and fails without the fix.
 
 **Fix (2026-09-23).** The hover readout only followed the cursor while a
 button was held: in Flutter a button-less mouse move is delivered as a

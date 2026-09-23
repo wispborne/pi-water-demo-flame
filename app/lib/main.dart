@@ -124,9 +124,8 @@ class _WaterAppState extends State<WaterApp> {
                       e.scrollDelta.dy,
                     );
                   }
-                  // Trackpad pinch/zoom is not a scroll: the platform
-                  // delivers it as a PointerScaleEvent with a
-                  // multiplicative scale (wheel zoom is a scroll delta).
+                  // Some embedders report pinch as a scale signal event;
+                  // macOS does not (see the panZoom callbacks below).
                   else if (e is PointerScaleEvent) {
                     widget.game.scale(
                       e.position.dx,
@@ -135,6 +134,19 @@ class _WaterAppState extends State<WaterApp> {
                     );
                   }
                 },
+                // macOS delivers trackpad pinch AND two-finger pan as
+                // panZoom pointer changes (not signal events): scale is
+                // cumulative since the gesture began, panDelta is the
+                // per-event pan. Wheel zoom is a scroll signal.
+                onPointerPanZoomStart: (_) => widget.game.panZoomStart(),
+                onPointerPanZoomUpdate: (e) => widget.game.panZoomUpdate(
+                  e.position.dx,
+                  e.position.dy,
+                  e.panDelta.dx,
+                  e.panDelta.dy,
+                  e.scale,
+                ),
+                onPointerPanZoomEnd: (_) => widget.game.panZoomEnd(),
                 child: GameWidget(game: widget.game),
               ),
             ),
