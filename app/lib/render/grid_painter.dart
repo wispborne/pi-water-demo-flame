@@ -109,7 +109,7 @@ class GridPainter {
     _drawLamps(c, world);
     _drawSun(c, state.sim.sun, small: traced);
     _drawSurface(c, world, water, state.sim.sun.timeSec, state.glow);
-    _drawHover(c, hover);
+    _drawHover(c, hover, cam.cellPx);
 
     c.restore();
   }
@@ -268,12 +268,14 @@ class GridPainter {
     );
   }
 
-  /// The hover crosshair (the hovered cell, for the HUD readout).
-  static void _drawHover(Canvas c, (int, int) hover) {
+  /// The hover crosshair (the hovered cell, for the HUD readout). The stroke
+  /// is screen-constant (1.5 px) so it stays crisp at fit zoom, where a
+  /// fixed world-unit stroke would be sub-pixel.
+  static void _drawHover(Canvas c, (int, int) hover, double cellPx) {
     if (hover.$1 < 0) return;
     final paint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.08
+      ..strokeWidth = 1.5 / cellPx
       ..color = const Color(0xCCFFFFFF);
     c.drawRect(
       Rect.fromLTWH(hover.$1.toDouble(), hover.$2.toDouble(), 1, 1),

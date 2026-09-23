@@ -63,14 +63,11 @@ class _HudOverlayState extends State<HudOverlay> {
   @override
   Widget build(BuildContext context) {
     final s = widget.state;
-    return IgnorePointer(
-      ignoring: false,
-      child: Stack(
-        children: [
-          Positioned(top: 8, left: 8, child: _hoverPanel(s)),
-          Positioned(left: 8, right: 8, bottom: 8, child: _bottomBar(s)),
-        ],
-      ),
+    return Stack(
+      children: [
+        Positioned(top: 8, left: 8, child: _hoverPanel(s)),
+        Positioned(left: 8, right: 8, bottom: 8, child: _bottomBar(s)),
+      ],
     );
   }
 
@@ -277,7 +274,7 @@ class _HudOverlayState extends State<HudOverlay> {
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    'keys 1-8 tools · LMB apply · RMB/MMB pan · wheel/pinch zoom',
+                    'keys 1-8 tools · P pause · S speed · G glow · T path trace · R reset · N new seed · LMB apply · RMB/MMB pan · wheel/pinch zoom',
                     style: TextStyle(fontSize: 11, color: Colors.white54),
                   ),
                 ],

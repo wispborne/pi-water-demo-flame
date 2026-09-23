@@ -33,6 +33,8 @@ Live review of the running app (captures in `out/shot9.png`,
     `hp/maxHp`, colour lerping green→amber→red as it drops. Verify:
     hammer a structural cell, hover it, bar shrinks and recolors.
 3. **Hover crosshair is sub-pixel at the default fit zoom.**
+   *(Fixed 2026-09-23: the stroke is now screen-constant, `1.5 / cellPx` —
+   `cam.cellPx` is passed into `_drawHover`.)*
    `app/lib/render/grid_painter.dart:272-282` — stroke `0.08` *world*
    units; at fit zoom (cellPx ≈ 3) that is ~0.24 px on screen, so no
    outline is visible in the captures. Fix: screen-constant stroke,
@@ -40,18 +42,25 @@ Live review of the running app (captures in `out/shot9.png`,
    `strokeWidth: 1.5 / cellPx`. Verify: crisp 1–2 px outline at fit
    zoom and at 8× zoom.
 4. **Key-hint line omits the P/S/G/T/R/N shortcuts.**
+   *(Fixed 2026-09-23: the hint now reads `keys 1-8 tools · P pause · S
+   speed · G glow · T path trace · R reset · N new seed · LMB apply ·
+   RMB/MMB pan · wheel/pinch zoom`.)*
    `app/lib/ui/hud.dart:238-241` shows only
    `keys 1-8 tools · LMB apply · RMB/MMB pan · wheel zoom`, but the app
    also has P pause, S speed, G glow, T path trace, R reset, N new seed
    (`app/lib/main.dart:42-62`; README documents them). Fix: extend the
    hint string (the row is horizontally scrollable, length is fine).
 5. **Dead `IgnorePointer(ignoring: false)` wrapper in the HUD build.**
+   *(Fixed 2026-09-23: the `Stack` is returned directly.)*
    `app/lib/ui/hud.dart:66-74` — `ignoring: false` is the identity
    transform; return the `Stack` directly. Verify: `flutter analyze` +
    the 13 GUI contract tests in `app/test/`.
 6. **(Cosmetic) Window title is `water_tower_app`** — `app/windows/runner/main.cpp:30`;
    `MaterialApp(title: '30 Floors & a Pool')` in main.dart:77 does not
    affect the OS title bar.
+   *(Fixed 2026-09-23: the Windows `window.Create` title and the macOS
+   `MainMenu.xib` window/app-menu titles now read `30 Floors & a Pool`
+   (the xib had the literal `APP_NAME` placeholder).)*
 
 Notes on what was verified live: traced light field, sun, lamps,
 glow, water, bottom-bar layout, buttons, sliders, dropdown, seed field
