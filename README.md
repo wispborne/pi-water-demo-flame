@@ -105,11 +105,13 @@ The GUI (Phase 6) is the `app/` Flutter package, run separately:
 cd app
 flutter pub get
 flutter run -d windows
+flutter run -d macos
 flutter test       # the 14 GUI contract tests
 ```
 
 Or, on Windows, just double-click `run.bat` (it builds the release on the
-first run, then launches the app).
+first run, then launches the app), or on macOS run `./run.sh` (same: release
+build if needed, then launch).
 
 ## Status
 
@@ -142,6 +144,9 @@ camera fit, wheel zoom and middle/right-button pan, seed/reset rebuilds,
 speed propagation, the traced-view fallback, the tool keys, and the
 hover readout's SPEC 10 strength bar. Verified
 in the running app on Windows: `cd app && flutter run -d windows`.
+macOS desktop support was added on 2026-09-23 (`app/macos/` via
+`flutter create --platforms=macos`, org `com.water_tower`); the app builds
+and runs there with the same 14/14 `flutter test` pass.
 
 **Fix (2026-09-22).** The hover readout was missing the SPEC 10
 colour-coded strength bar: `_hoverPanel` showed `HP x/y` as text only. It
