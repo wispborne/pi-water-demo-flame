@@ -55,6 +55,37 @@ void main() {
     }
   });
 
+  test('a poured water column spreads out instead of piling up', () {
+    final w = bare();
+    ground(w, 238);
+    // A 60-cell column poured at x=105, free to spread either way.
+    for (var y = 178; y < 238; y++) {
+      w.set(105, y, Material.water);
+    }
+    final eng = Water();
+    final v0 = eng.countWater(w);
+    for (var t = 0; t < 30; t++) {
+      eng.tick(w);
+    }
+    expect(eng.countWater(w), v0, reason: 'volume changed');
+    // The column must have pancaked into a shallow pool, not kept standing
+    // as a pillar: no water column deeper than 8 cells after 30 ticks.
+    var maxH = 0;
+    for (var x = 0; x < Constants.gridW; x++) {
+      var h = 0;
+      for (var y = 237; y >= 0; y--) {
+        if (w.at(x, y) != Material.water) break;
+        h++;
+      }
+      if (h > maxH) maxH = h;
+    }
+    expect(
+      maxH,
+      lessThanOrEqualTo(8),
+      reason: 'column still piled: max height $maxH after 30 ticks',
+    );
+  });
+
   test('a contained pool reaches a level surface at exactly its depth', () {
     final w = bare();
     ground(w, 238);

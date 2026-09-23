@@ -143,6 +143,20 @@ void main() {
     expect(water.countWater(w), 1442);
   });
 
+  test('falling rubble drops at the settling rate, not one cell per tick',
+      () {
+    final w = ground();
+    // 137 cells above the floor: a 1-cell-per-tick grain could not reach it
+    // within 60 ticks.
+    w.set(100, 100, Material.rubble);
+    drive(w, null, Structure(), 60);
+    expect(
+      w.at(100, 237),
+      Material.rubble,
+      reason: 'rubble had not reached the floor within 60 ticks',
+    );
+  });
+
   test('a ceiling lamp is released when its slab breaks and falls lit', () {
     final w = ground();
     w.fillRect(98, 229, 102, 229, Material.concrete); // unsupported slab

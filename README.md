@@ -28,17 +28,20 @@ is a pure-Dart package — headless-testable on any box; the GUI is the
   - `tower.dart` — `WorldBuilder`: ground, tower, floors/rooms, furniture,
     lamps, pool.
   - `lamp.dart` — the three lamp kinds (floor / ceiling / table) and states.
-  - `water.dart` — falling-sand water: per-body BFS head (carried sideways),
-    erosion at head > material tolerance, lateral momentum, jets (a
-    head ≥ 8 confined body spurts out of an open crack as a held spurt
-    column), wash (flowing water scours rubble/debris sideways), volume
-    conserved.
+  - `water.dart` — falling-sand water: the falling/flow pass runs as
+    substeps per tick (early-exiting when settled) so a poured column
+    pancakes out instead of standing as a pillar; per-body BFS head
+    (carried sideways), erosion at head > material tolerance, lateral
+    momentum, jets (a head ≥ 8 confined body spurts out of an open crack as
+    a held spurt column), wash (flowing water scours rubble/debris
+    sideways), volume conserved.
   - `structure.dart` — structural failure: a section severed from the
     foundation (support gap ≥ 3 air cells; gaps ≤ 2 bridge) slumps for
     ~2 sim-seconds, then breaks into rubble (heavy materials) or debris.
   - `buoyancy.dart` — loose objects: rigid furniture masses and free lamps
-    plus granular rubble/debris; water displacement, floats rising,
-    heavies sinking; ceiling lamps release and fall lit.
+    plus granular rubble/debris (which fall at the water's settling rate —
+    one gravity for everything granular); water displacement, floats
+    rising, heavies sinking; ceiling lamps release and fall lit.
   - `sun.dart` — the sun disc: a deterministic function of sim time (420 s
     cycle, left-right arc, freezes when the world is paused).
   - `tools.dart` — the eight user tools (hammer, bomb, water, erase, four
@@ -48,11 +51,13 @@ is a pure-Dart package — headless-testable on any box; the GUI is the
   (0.5/1/2, paused at 0) → physics ticks at 30/s; owns the sim clock, the
   sun, and the tools; water volume is conserved through it.
 - `test/phase1_test.dart` — determinism + structural invariants.
-- `test/phase2_test.dart` — water contract: settle/level, per-body head
-  erosion, tolerance boundaries, jets, volume conservation.
+- `test/phase2_test.dart` — water contract: settle/level, a poured column
+  spreads out instead of piling up, per-body head erosion, tolerance
+  boundaries, jets, volume conservation.
 - `test/phase3_test.dart` — structure + buoyancy contract: severance at a
   3-cell gap, 2-cell gap bridges, slump → rubble, deep water washes rubble
-  out of a vertical column, floats rest at the surface, heavies sink,
+  out of a vertical column, rubble falls at the settling rate, floats rest
+  at the surface, heavies sink,
   water displacement conserves volume, ceiling lamp releases.
 - `test/phase4_test.dart` — sun determinism, the eight tools (hammer to
   rubble, bomb falloff, build/erase, rain at 3 rates, keys 1–8), and the
@@ -127,7 +132,11 @@ commit. Decisions are in `PLAN.md`; the design context in `CONTEXT.md`.
 | 5 | Traced view (progressive light field) | ✅ done |
 | 6 | GUI (Flutter/Flame) | ✅ done |
 
-**Phase 6 is complete and committed.** The GUI is a Flutter/Flame desktop
+**Phase 6 is complete and committed.** Water settling now runs as substeps
+per tick (early-exiting when nothing moves): a poured column pancakes out
+in well under a second instead of standing as a pillar, and granular
+rubble/debris falls at the same rate as water. Settled fields cost no more
+than a single pass. The GUI is a Flutter/Flame desktop
 app (`app/`) over the pure-Dart core. The camera fits the whole world at
 load and after Reset / New seed; left-drag applies the selected tool,
 right- or middle-drag pans, and the wheel and trackpad pinch zoom around

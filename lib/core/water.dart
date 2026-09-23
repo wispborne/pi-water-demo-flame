@@ -16,10 +16,14 @@ class Spurt {
 }
 
 /// Falling-sand water (PLAN technique choice): each water cell steps one row
-/// down or one column sideways per tick — the field never overshoots, so it
-/// is unconditionally stable. A water cell falls when it can; otherwise it
-/// flows sideways, so water levels out (finds its own level). On top of the
-/// cell model:
+/// down or one column sideways per settle substep — the field never
+/// overshoots, so it is unconditionally stable. A tick runs
+/// [Constants.settleSubsteps] substeps of the falling/flow pass (stopping
+/// early when a pass moves nothing), so a poured column sheds
+/// [Constants.settleSubsteps] cells per tick and pancakes out instead of
+/// standing as a pillar. A water cell falls when it can; otherwise it flows
+/// sideways, so water levels out (finds its own level). On top of the cell
+/// model:
 ///
 /// * **Per-body hydrostatic head** — BFS flood fill finds connected water
 ///   bodies; the body's maximum head (its depth from its own surface) is
@@ -48,9 +52,14 @@ class Spurt {
 /// water appears only via erosion (a wall cell crumbles into water), tools,
 /// and rain (a spurt's cells fall back into the column when the jet stops).
 class Water {
-  /// Lateral velocity per water cell, 4-bit fixed point (16 = 1 cell/tick),
-  /// signed (positive = right). Decays per tick; rests when unsupported.
+  /// Lateral push per water cell, 4-bit fixed point (16 = full push), signed
+  /// (positive = right). Sets a fresh push when a cell starts flowing, decays
+  /// while blocked, flips when it bounces off a wall; a resting cell (no air
+  /// on either side) holds zero.
   final List<int> momentum;
+
+  /// Cell moves made by the current settle pass (resets each substep).
+  int _moves = 0;
 
   /// Head per water cell: depth in cells below its body's own surface row
   /// (for the tracer's depth tinting and the HUD pressure readout).
@@ -268,27 +277,54 @@ class Water {
 
   // -- falling sand ------------------------------------------------------
 
+  /// The falling/flow pass, run [Constants.settleSubsteps] times per tick:
+  /// each pass lets one more cell per column flow out of a pile, so a poured
+  /// column collapses substeps-per-tick faster than one pass would. A pass
+  /// that moves nothing proves the field is settled (nothing to fall,
+  /// nothing to flow), so the remaining substeps are skipped.
   void _settle(World w) {
     const W = Constants.gridW;
     final H = Constants.gridH;
-    for (var y = H - 1; y >= 0; y--) {
-      final ltr = y.isEven; // deterministic per-row scan order
-      for (var c = 0; c < W; c++) {
-        final x = ltr ? c : (W - 1 - c);
-        final idx = y * W + x;
-        if (w.cells[idx] != Material.water) continue;
-        // Fall first: a cell over an empty cell drops (water never enters
-        // rubble/debris — the granular cells sink/float out of the way by
-        // swap, in the buoyancy pass).
-        if (_move(w, idx, 0, 1)) continue;
-        // The fall failed (below is water, a wall, or the bottom row):
-        // flow sideways, so water levels out (finds its own level).
-        _flowSideways(w, idx, x, y);
+    for (var sub = 0; sub < Constants.settleSubsteps; sub++) {
+      _moves = 0;
+      for (var y = H - 1; y >= 0; y--) {
+        final ltr = y.isEven; // deterministic per-row scan order
+        for (var c = 0; c < W; c++) {
+          final x = ltr ? c : (W - 1 - c);
+          final idx = y * W + x;
+          if (w.cells[idx] != Material.water) continue;
+          // Fall first: a cell over an empty cell drops (water never enters
+          // rubble/debris — the granular cells sink/float out of the way by
+          // swap, in the buoyancy pass).
+          if (_move(w, idx, 0, 1)) continue;
+          // The fall failed (below is water, a wall, or the bottom row):
+          // flow sideways, so water levels out (finds its own level).
+          _flowSideways(w, idx, x, y);
+        }
       }
+      if (_moves == 0) break; // settled
     }
   }
 
   void _flowSideways(World w, int idx, int x, int y) {
+    // At rest: no open air and no washable grain on either side, so no
+    // sideways move can carry. Rest the push to zero (a fresh hash
+    // direction starts it again when air opens) and skip the bounce/flap
+    // bookkeeping.
+    final W = Constants.gridW;
+    final left = x > 0 ? w.cells[idx - 1] : Material.ground;
+    final right = x + 1 < W ? w.cells[idx + 1] : Material.ground;
+    final flowable =
+        left == Material.air ||
+        right == Material.air ||
+        left == Material.rubble ||
+        left == Material.debris ||
+        right == Material.rubble ||
+        right == Material.debris;
+    if (!flowable) {
+      momentum[idx] = 0;
+      return;
+    }
     var mv = momentum[idx];
     if (mv == 0) {
       // A deterministic pseudo-random direction, sized with the body's
@@ -340,6 +376,7 @@ class Water {
     w.cells[src] = Material.air;
     momentum[t] = (dy > 0 && dx == 0) ? 0 : momentum[src];
     head[t] = head[src];
+    _moves++;
     return true;
   }
 
@@ -361,6 +398,7 @@ class Water {
     w.cells[src] = Material.air;
     momentum[t] = momentum[src];
     head[t] = head[src];
+    _moves++;
     return true;
   }
 

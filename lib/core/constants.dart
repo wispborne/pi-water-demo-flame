@@ -28,6 +28,12 @@ class Constants {
   /// Physics: 30 ticks/s at 1x; slump lasts 2 sim-seconds (decision 4).
   static const int physicsTicksPerSec = 30;
 
+  /// Settling substeps per tick (the water falling/flow pass and the
+  /// granular rubble/debris pass): a pile sheds one cell per substep, so a
+  /// poured column collapses [settleSubsteps]x faster than a single pass
+  /// would; a settled field makes no moves and exits after the first pass.
+  static const int settleSubsteps = 6;
+
   /// Tools: brush size 1..15 cells (default 5); rain 0..40 cells/s (SPEC 8/9).
   static const int brushMin = 1;
   static const int brushMax = 15;

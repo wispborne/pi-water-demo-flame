@@ -40,8 +40,10 @@ class LooseObject {
 /// * **Rigid**: each furniture piece (its 4-connected same-material cells)
 ///   and each free lamp moves as a unit, at most one cell per tick.
 /// * **Granular**: rubble and debris cells fall one cell at a time (a broken
-///   section crumbles, it does not slide as a slab); rubble sinks through
-///   water, debris floats to the surface.
+///   section crumbles, it does not slide as a slab), over
+///   [Constants.settleSubsteps] passes per tick to match the water's
+///   settling rate; rubble sinks through water, debris floats to the
+///   surface.
 ///
 /// Water never overlaps an object: when an object moves vertically, the
 /// water in the row it moves into is displaced into the row it vacates
@@ -143,38 +145,48 @@ class Buoyancy {
     }
   }
 
-  /// Granular broken material: rubble sinks, debris floats (SPEC 5).
+  /// Granular broken material: rubble sinks, debris floats (SPEC 5). Runs
+  /// [Constants.settleSubsteps] passes per tick (early-exiting when a pass
+  /// moves nothing) so falling/sinking grains share the water's settling
+  /// rate — one gravity for everything granular.
   void _granular(World w) {
     const W = Constants.gridW;
     final H = Constants.gridH;
-    for (var y = H - 2; y >= 0; y--) {
-      final ltr = y.isEven; // deterministic per-row scan order
-      for (var c = 0; c < W; c++) {
-        final x = ltr ? c : (W - 1 - c);
-        final i = y * W + x;
-        final m = w.cells[i];
-        if (m != Material.rubble && m != Material.debris) continue;
-        final below = w.cells[i + W];
-        if (below == Material.air) {
-          w.cells[i + W] = m;
-          w.cells[i] = Material.air;
-          continue;
-        }
-        if (below != Material.water) continue;
-        if (m == Material.rubble) {
-          // Sinks: swap with the water below.
-          w.cells[i + W] = m;
-          w.cells[i] = Material.water;
-        } else {
-          // Debris floats: rises only when fully submerged (water above too),
-          // rests at the surface.
-          final above = w.cells[i - W];
-          if (above == Material.water) {
-            w.cells[i - W] = m;
+    for (var sub = 0; sub < Constants.settleSubsteps; sub++) {
+      var moved = 0;
+      for (var y = H - 2; y >= 0; y--) {
+        final ltr = y.isEven; // deterministic per-row scan order
+        for (var c = 0; c < W; c++) {
+          final x = ltr ? c : (W - 1 - c);
+          final i = y * W + x;
+          final m = w.cells[i];
+          if (m != Material.rubble && m != Material.debris) continue;
+          final below = w.cells[i + W];
+          if (below == Material.air) {
+            w.cells[i + W] = m;
+            w.cells[i] = Material.air;
+            moved++;
+            continue;
+          }
+          if (below != Material.water) continue;
+          if (m == Material.rubble) {
+            // Sinks: swap with the water below.
+            w.cells[i + W] = m;
             w.cells[i] = Material.water;
+            moved++;
+          } else {
+            // Debris floats: rises only when fully submerged (water above
+            // too), rests at the surface.
+            final above = w.cells[i - W];
+            if (above == Material.water) {
+              w.cells[i - W] = m;
+              w.cells[i] = Material.water;
+              moved++;
+            }
           }
         }
       }
+      if (moved == 0) break; // settled
     }
   }
 
