@@ -24,12 +24,14 @@ Live review of the running app (captures in `out/shot9.png`,
    to match the water. Verify: screenshot with `out/_shot.ps1`, all
    HUD text legible.
 2. **Hover readout missing the SPEC 10 colour-coded strength bar.**
-   SPEC.md §10: the hover readout must show remaining strength *with a
-   colour-coded bar*. `app/lib/ui/hud.dart:97-106` (`_hoverPanel`)
-   renders `HP $hp/$maxHp head $head` as text only (the traced-mode
-   light swatch at 107-118 is present). Fix: add a ~60×6 bar filled
-   `hp/maxHp`, colour lerping green→amber→red as it drops. Verify:
-   hammer a structural cell, hover it, bar shrinks and recolors.
+    *(Fixed 2026-09-22: the bar is in `_hoverPanel`, gated to damageable
+    cells, with a GUI contract test.)*
+    SPEC.md §10: the hover readout must show remaining strength *with a
+    colour-coded bar*. `app/lib/ui/hud.dart:97-106` (`_hoverPanel`)
+    renders `HP $hp/$maxHp head $head` as text only (the traced-mode
+    light swatch at 107-118 is present). Fix: add a ~60×6 bar filled
+    `hp/maxHp`, colour lerping green→amber→red as it drops. Verify:
+    hammer a structural cell, hover it, bar shrinks and recolors.
 3. **Hover crosshair is sub-pixel at the default fit zoom.**
    `app/lib/render/grid_painter.dart:272-282` — stroke `0.08` *world*
    units; at fit zoom (cellPx ≈ 3) that is ~0.24 px on screen, so no

@@ -3,6 +3,7 @@
 // - speed / pause / scale propagate to the sim driver;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:water_tower/core/constants.dart';
 import 'package:water_tower/core/materials.dart' as core;
@@ -199,6 +200,54 @@ void main() {
     expect(find.text('Reset'), findsOneWidget);
     expect(find.text('New seed'), findsOneWidget);
     expect(find.textContaining('Path trace'), findsOneWidget);
+    game.dispose();
+  });
+
+  testWidgets('hover readout shows the SPEC 10 strength bar', (tester) async {
+    final state = SimState('seed-42');
+    final game = WaterGame(state);
+    state.paused = true; // freeze the sim so the hovered cell is stable
+    await tester.pumpWidget(WaterApp(state: state, game: game));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // Find an undamaged structural cell.
+    int cx = -1, cy = -1;
+    outer:
+    for (var y = 0; y < Constants.gridH; y++) {
+      for (var x = 0; x < Constants.gridW; x++) {
+        final m = state.world.at(x, y);
+        if (core.Materials.structure.contains(m) &&
+            state.world.strength[state.world.idx(x, y)] ==
+                core.Materials.of(m).hp) {
+          cx = x;
+          cy = y;
+          break outer;
+        }
+      }
+    }
+    expect(cx, greaterThanOrEqualTo(0));
+    final maxHp = core.Materials.of(state.world.at(cx, cy)).hp;
+
+    // Hover it: the bar appears, full width.
+    final px = game.cam.offX + (cx + 0.5) * game.cam.cellPx;
+    final py = game.cam.offY + (cy + 0.5) * game.cam.cellPx;
+    game.pointerMove(px, py, 0);
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(find.byKey(const ValueKey('strength-bar')), findsOneWidget);
+    final full = tester.getSize(find.byKey(const ValueKey('strength-bar-fill')));
+    expect(full.width, closeTo(60, 0.5));
+
+    // Hammer the cell down to 1 hp: the bar shrinks in proportion.
+    state.tools.tool = Tool.hammer;
+    for (var i = 0; i < maxHp - 1; i++) {
+      state.sim.tools.apply(state.world, cx, cy);
+    }
+    await tester.pump(const Duration(milliseconds: 150));
+    final hp = state.world.strength[state.world.idx(cx, cy)];
+    expect(hp, 1);
+    final shrunken = tester.getSize(find.byKey(const ValueKey('strength-bar-fill')));
+    expect(shrunken.width, closeTo(60 * hp / maxHp, 0.5));
     game.dispose();
   });
 }

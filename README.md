@@ -86,7 +86,7 @@ is a pure-Dart package — headless-testable on any box; the GUI is the
     line and glow band on top; the scene is lit only by the traced light).
   - `ui/hud.dart` — the 10 Hz overlay: counters, hover readout, controls,
     sliders.
-  - `test/widget_test.dart` — the 13 GUI contract tests.
+  - `test/widget_test.dart` — the 14 GUI contract tests.
 
 ## Run
 
@@ -105,7 +105,7 @@ The GUI (Phase 6) is the `app/` Flutter package, run separately:
 cd app
 flutter pub get
 flutter run -d windows
-flutter test       # the 13 GUI contract tests
+flutter test       # the 14 GUI contract tests
 ```
 
 Or, on Windows, just double-click `run.bat` (it builds the release on the
@@ -137,10 +137,20 @@ Hz) shows the counters
 (material, strength, pressure, light swatch), the controls (Pause, Speed,
 Reset, New seed, Glow, Path trace), and the sliders (brush, rain, floors,
 width, structure) with a seed-name field; tapping a control returns
-keyboard focus to the game. The 13 `flutter test` contract tests cover the
+keyboard focus to the game. The 14 `flutter test` contract tests cover the
 camera fit, wheel zoom and middle/right-button pan, seed/reset rebuilds,
-speed propagation, the traced-view fallback, and the tool keys. Verified
+speed propagation, the traced-view fallback, the tool keys, and the
+hover readout's SPEC 10 strength bar. Verified
 in the running app on Windows: `cd app && flutter run -d windows`.
+
+**Fix (2026-09-22).** The hover readout was missing the SPEC 10
+colour-coded strength bar: `_hoverPanel` showed `HP x/y` as text only. It
+now draws a 60×6 bar between the material name and the counters, filled
+`hp/maxHp`, colour lerping green→amber→red as it drops — shown only for
+damageable cells (air/water and the 999-hp sentinels would read as a full
+green bar). A 14th GUI contract test verifies it: hovering an intact
+structural cell shows a full-width bar, hammering the cell to 1 hp shrinks
+the fill in proportion.
 
 **Fix (2026-09-22).** The tracer's ray march was a one-cell-diagonal
 staircase, not the straight ray to the light: on shallow rays it ran a row

@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:water_tower/core/materials.dart';
+import 'package:water_tower/core/materials.dart' as core;
 import 'package:water_tower/core/tools.dart';
 import 'package:water_tower_app/game/water_game.dart';
 import 'package:water_tower_app/sim_state.dart';
@@ -80,11 +80,15 @@ class _HudOverlayState extends State<HudOverlay> {
     final i = s.world.idx(hx, hy);
     final m = s.world.at(hx, hy);
     final hp = s.world.strength[i];
-    final maxHp = Materials.of(m).hp;
+    final maxHp = core.Materials.of(m).hp;
     final head = s.sim.water.bodyHead[i];
     final traced = s.pathTrace;
     final (r, g, b) = s.tracer.field.rgb8(i);
     final lum = (s.tracer.field.luminance(i) * 100).round();
+    // The bar is only meaningful for damageable cells: structure, furniture,
+    // wood, glass, lamps. Air/water (hp 1) and the 999-hp sentinels
+    // (ground/rubble/debris, untouchable) would read as a full green bar.
+    final showBar = maxHp < 999 && m != core.Material.air && m != core.Material.water;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -98,7 +102,11 @@ class _HudOverlayState extends State<HudOverlay> {
             m.name,
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
           ),
-          const SizedBox(width: 8),
+          if (showBar) ...[
+            const SizedBox(width: 8),
+            _strengthBar(hp, maxHp),
+            const SizedBox(width: 8),
+          ],
           Text(
             'HP $hp/$maxHp  head $head'
             '${traced ? '  light $lum%' : ''}',
@@ -117,6 +125,39 @@ class _HudOverlayState extends State<HudOverlay> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  /// SPEC 10: remaining strength as a colour-coded bar — full green when
+  /// intact, lerp to amber at half, red at zero.
+  Widget _strengthBar(int hp, int maxHp) {
+    final t = (hp / maxHp).clamp(0.0, 1.0);
+    final color = t >= 0.5
+        ? Color.lerp(
+              const Color(0xFFFFC107), const Color(0xFF4CAF50), (t - 0.5) / 0.5)
+        : Color.lerp(
+              const Color(0xFFEF5350), const Color(0xFFFFC107), t / 0.5);
+    return Container(
+      key: const ValueKey('strength-bar'),
+      width: 60,
+      height: 6,
+      decoration: BoxDecoration(
+        color: const Color(0x33FFFFFF),
+        borderRadius: BorderRadius.circular(3),
+      ),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: FractionallySizedBox(
+          widthFactor: t,
+          child: Container(
+            key: const ValueKey('strength-bar-fill'),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+        ),
       ),
     );
   }
