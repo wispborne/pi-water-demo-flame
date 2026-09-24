@@ -2,7 +2,12 @@
 
 ## Workflow
 
-- Commit and push regularly. When a piece of work is complete and verified, commit it with a plain message saying what changed, and push to `origin`. Don't let working changes pile up uncommitted across sessions.
+- Commit and push regularly. When a piece of work is complete and verified, commit it with a plain message saying what changed, and push to both remotes (`origin` and `gitea`). Don't let working changes pile up uncommitted across sessions.
+
+## Remotes
+
+- Push to both `origin` (GitHub) and `gitea` at the same time.
+- Pull from `gitea` only.
 - Keep `README.md` updated as work progresses: after each phase lands, update its row in the status table and the `## Status` note.
 - Each phase ends in a green `dart test` run and a commit (see `PHASES.md`).
 - `out/` is gitignored (ASCII dumps from `tool/`, screenshots).
@@ -49,6 +54,10 @@ flutter analyze
 - **`.bat` files need CRLF line endings** and no unbalanced parentheses inside `(...)` blocks, or they die silently.
 - Gate `print()` diagnostics with `bool.fromEnvironment('FLAG')` + `dart run --define=FLAG=true` (`dart test` does not accept `--define`).
 - To inspect the live GUI without a window, use the `tool/` headless repros (e.g. `dart run tool/_skycheck.dart`), not screenshots.
+
+## Rabbit Holes
+
+Every time you start thinking, first pose this question to yourself: am I going down a rabbit hole? If so, STOP.
 
 ## Screenshots
 
