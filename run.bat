@@ -26,7 +26,7 @@ if "%NEED%"=="0" goto run
 :build
 echo Building the Windows release.
 pushd app
-flutter build windows --release
+call flutter build windows --release
 popd
 if errorlevel 1 (
   echo Build failed.
