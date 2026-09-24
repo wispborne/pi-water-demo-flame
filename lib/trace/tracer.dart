@@ -1,12 +1,13 @@
-import 'dart:math' as math;
 import 'dart:typed_data';
 
 import '../core/constants.dart';
-import '../core/materials.dart';
 import '../core/sun.dart';
 import '../core/water.dart';
 import '../core/world.dart';
 import 'field.dart';
+import 'ray.dart';
+import 'shadows.dart';
+import 'transport.dart';
 
 /// The per-frame ray budget meter (PLAN decision 2): the traced view stays
 /// within 1,500-2,500 pixel-light shadow rays per frame at 1x. A *sustained*
@@ -43,24 +44,28 @@ class TraceBudget {
   }
 }
 
-/// The traced view (SPEC 7, PLAN technique "NEE + MIS"): every grid cell
-/// carries a per-cell light estimate built from direct next-event rays to
-/// the known lights (the sun + the lit lamps). Rays march deterministically
-/// cell by cell through the grid: structure/ground/wood block, glass tints,
-/// water tints by wavelength-dependent Beer-Lambert (red dies first).
+/// The traced view (SPEC 7): every grid cell carries a per-cell light
+/// estimate from direct next-event estimation to the known lights (the sun
+/// plus the lit lamps), the true caustic gathered from sun rays refracted
+/// at the water surface, single-scatter shafts, and two diffuse bounces.
 ///
-/// The field is progressive: a cell's value is a running mean of its exact
-/// sample, so a change never flashes black and converged cells keep their
-/// value. Per frame the tracer (1) diffs the world (grid materials, the
-/// spurt overlay, lamp positions/states) and marks the changed cells dirty
-/// plus a margin, (2) re-samples dirty cells within the frame's ray budget
-/// (a cell the budget leaves behind keeps its last value and re-samples
-/// next frame, so any change settles over ~1 s, the same window as the sun
-/// drift), and (3) spends the remaining budget on a rotating stripe of
-/// undirty cells so the field follows the slowly drifting sun. At the
-/// 2,500-ray cap the stripe covers the whole field in ~1 s, exactly the
-/// settle time the spec asks for. Steady state on a settled scene costs
-/// ~2,500 rays/frame and never more.
+/// Geometry is precomputed per frame from the diffed world:
+///
+/// * [SceneSpans] — per-column contiguous spans of occluder/water/glass
+///   cells; a ray costs the columns it crosses, not its length in cells.
+/// * [ShadowSweep]s — one angular sweep per light (Eberly's 2-D shadow
+///   map): light visibility is an O(log B) angle lookup instead of a DDA
+///   march.
+///
+/// The field stays progressive exactly as before: a cell's value is a
+/// running mean of its (exact, deterministic) sample, so a change never
+/// flashes black. Per frame the tracer (1) diffs the world (grid
+/// materials, the spurt overlay, lamp positions/states) and marks the
+/// changed cells dirty plus a margin, (2) re-samples dirty cells within
+/// the frame's ray budget, and (3) spends the remaining budget on a
+/// rotating stripe of undirty cells so the field follows the slowly
+/// drifting sun. Steady state on a settled scene costs ~2,500 rays/frame
+/// and never more.
 class Tracer {
   final LightField field = LightField();
   final TraceBudget budget = TraceBudget();
@@ -71,50 +76,19 @@ class Tracer {
   /// Shadow edges shift a few cells when a material moves one cell.
   static const int _margin = 2;
 
-  /// A lamp's light is marched for cells within this many cells of it.
+  /// A lamp's light is sampled for cells within this many cells of it.
   static const int _lampRadius = 48;
-
-  // Sun colour: warm white, slightly over 1 so a clear-sky cell reads bright
-  // (the GUI tone-maps with Reinhard).
-  static const double _sunR = 1.40;
-  static const double _sunG = 1.33;
-  static const double _sunB = 1.19;
-
-  // Lamp colour: warm tungsten.
-  static const double _lampR = 1.20;
-  static const double _lampG = 0.74;
-  static const double _lampB = 0.36;
-
-  // Beer-Lambert per water cell traversed: red absorbed fastest, so deep
-  // water reads dark blue-green.
-  static const double _waterR = 0.62;
-  static const double _waterG = 0.88;
-  static const double _waterB = 0.80;
-
-  /// Glass transmittance per cell (a slight cool tint).
-  static const double _glassT = 0.94;
-
-  // Forward-scattering shafts: extra in-water light, strongest when the sun
-  // is high (its rays run through the water column).
-  static const double _shaftK = 0.12;
-
-  // Surface glint: a narrow lobe centred on the sun's x (the specular band
-  // that glitters under the sun), wobbled by the wave slope so it shimmers
-  // with the drawn surface.
-  static const double _glintK = 0.90;
-  static const double _glintWidth = 7.0;
-  static const double _glintSlopeCoupling = 2.5;
-
-  // Caustic: a surface cell's refracted spot lands a few cells over,
-  // deflected by the wave slope, so the floor pattern drifts with the waves.
-  static const double _causticK = 0.40;
-  static const int _causticSpread = 8;
-  static const double _waveAmp = 0.75;
 
   /// The mean weight for the sun-drift stripe pass: a converged cell keeps
   /// following the sun (per-channel first-order lag), with a sub-second
   /// lag over the rotating stripe.
   static const double _trackWeight = 0.25;
+
+  final SceneSpans _spans = SceneSpans();
+  final ShadowSweep _sunSweep = ShadowSweep();
+  final List<ShadowSweep> _lampSweeps = [];
+  final List<int> _lampX = [];
+  final List<int> _lampY = [];
 
   Uint8List? _prevMat;
   Uint8List? _prevSpurt;
@@ -133,17 +107,25 @@ class Tracer {
 
     final firstFrame = _prevMat == null;
     (int, int)? lampFocus;
+    final changedCols = <int>{};
     if (firstFrame) {
       // First frame (or after [field.clear]): the whole field is dirty.
       field.clear();
+      _spans.rebuildAll(w, water);
     } else {
       final prevMat = _prevMat!;
       for (var i = 0; i < curMat.length; i++) {
-        if (curMat[i] != prevMat[i]) _dirtyBox(i, _margin);
+        if (curMat[i] != prevMat[i]) {
+          _dirtyBox(i, _margin);
+          changedCols.add(i % _w);
+        }
       }
       final prevSpurt = _prevSpurt!;
       for (var i = 0; i < curSpurt.length; i++) {
-        if (curSpurt[i] != prevSpurt[i]) _dirtyBox(i, _margin);
+        if (curSpurt[i] != prevSpurt[i]) {
+          _dirtyBox(i, _margin);
+          changedCols.add(i % _w);
+        }
       }
       final prevLampSig = _prevLampSig!;
       if (!_setEquals(prevLampSig, curLampSig)) {
@@ -163,12 +145,30 @@ class Tracer {
           }
         }
       }
+      for (final c in changedCols) {
+        _spans.rebuildColumn(c, w, water);
+      }
     }
     _prevMat = curMat;
     _prevSpurt = curSpurt;
     _prevLampSig = curLampSig;
 
     final (sx, sy) = Sun.position(sun.timeSec);
+    _buildSunSweep(w, sx, sy);
+    _buildLampSweeps(w);
+
+    final transport = Transport(
+      _spans,
+      _sunSweep,
+      _lampSweeps,
+      _lampX,
+      _lampY,
+      w,
+      water,
+      sx,
+      sy,
+      sun.timeSec,
+    );
     var rays = 0;
 
     // Pass 1: dirty (never-sampled in this epoch) cells re-converge. The
@@ -194,7 +194,7 @@ class Tracer {
     }
     for (final i in dirty) {
       if (!firstFrame && rays >= TraceBudget.cap) break;
-      _sampleCell(i, w, water, sx, sy, sun.timeSec);
+      _sampleCell(transport, i);
       rays++;
     }
 
@@ -206,8 +206,7 @@ class Tracer {
       for (var k = 0; k < remaining; k++) {
         final i = (k * stride + _frame) % total;
         if (field.count(i) > 0) {
-          _sampleCell(i, w, water, sx, sy, sun.timeSec,
-              weight: _trackWeight);
+          _sampleCell(transport, i, weight: _trackWeight);
           rays++;
         }
       }
@@ -215,6 +214,58 @@ class Tracer {
 
     budget.record(rays);
     _frame++;
+  }
+
+  void _sampleCell(Transport t, int i, {double? weight}) {
+    final x = i % _w;
+    final y = i ~/ _w;
+    final (r, g, b) = t.sample(x, y);
+    field.sample(i, r, g, b, weight: weight);
+  }
+
+  /// The angular shadow map for the sun at (sx, sy): every light-blocking
+  /// cell is a disc occluder around its centre.
+  void _buildSunSweep(World w, double sx, double sy) {
+    final blockers = <(int, int)>[];
+    for (var x = 0; x < _w; x++) {
+      final runs = _spans.occl[x];
+      for (var s = 0; s < runs.length; s++) {
+        final packed = runs[s];
+        final lo = packed >>> 8;
+        final hi = (packed & 0xFF) + 1;
+        for (var y = lo; y < hi; y++) {
+          blockers.add((x, y));
+        }
+      }
+    }
+    _sunSweep.build(sx, sy, blockers);
+  }
+
+  /// One sweep per lit lamp (their light is static between world diffs).
+  void _buildLampSweeps(World w) {
+    _lampSweeps.clear();
+    _lampX.clear();
+    _lampY.clear();
+    final blockers = <(int, int)>[];
+    for (var x = 0; x < _w; x++) {
+      final runs = _spans.occl[x];
+      for (var s = 0; s < runs.length; s++) {
+        final packed = runs[s];
+        final lo = packed >>> 8;
+        final hi = (packed & 0xFF) + 1;
+        for (var y = lo; y < hi; y++) {
+          blockers.add((x, y));
+        }
+      }
+    }
+    for (final lamp in w.lamps) {
+      if (!lamp.isLit) continue;
+      final sweep = ShadowSweep();
+      sweep.build(lamp.x + 0.5, lamp.y + 0.5, blockers);
+      _lampSweeps.add(sweep);
+      _lampX.add(lamp.x);
+      _lampY.add(lamp.y);
+    }
   }
 
   /// Mark the box around cell [i] dirty (clamped to the grid).
@@ -256,187 +307,5 @@ class Tracer {
       if (!b.contains(e)) return false;
     }
     return true;
-  }
-
-  /// The exact per-cell light estimate: sun (shadow ray + shaft + glint)
-  /// plus caustic (floor cells) plus every lit lamp in range (shadow ray
-  /// with 1/d^2 falloff). A pure function of (world, water, lamps, sun
-  void _sampleCell(int i, World w, Water water, double sx, double sy,
-      double tSec, {double? weight}) {
-    final x = i % _w;
-    final y = i ~/ _w;
-    final m = w.at(x, y);
-    final inWater = m == Material.water || water.isSpurtCell(x, y);
-
-    var r = 0.0;
-    var g = 0.0;
-    var b = 0.0;
-
-    // --- Sun ---
-    final (sunTr, sunTg, sunTb, sunVisible) =
-        _march(x, y, sx, sy, w, water);
-    if (sunVisible) {
-      r += _sunR * sunTr;
-      g += _sunG * sunTg;
-      b += _sunB * sunTb;
-      final ddx = x - sx;
-      final ddy = y - sy;
-      final dist = math.sqrt(ddx * ddx + ddy * ddy) + 1e-9;
-      if (inWater) {
-        // Forward-scattering shafts: brightest when the sun is high.
-        final elev = (ddy < 0 ? -ddy : 0.0) / dist;
-        r += _sunR * _shaftK * elev;
-        g += _sunG * _shaftK * elev;
-        b += _sunB * _shaftK * elev;
-      }
-      if (_isWaterSurface(x, y, w)) {
-        final lobe = _glintLobe(x, sx, tSec);
-        if (lobe > 0) {
-          final elev = ((Constants.sunTopY +
-                      Constants.sunArcDepth -
-                      sy) /
-                  Constants.sunArcDepth)
-              .clamp(0.0, 1.0);
-          final glint = _glintK * lobe * elev;
-          r += _sunR * glint * sunTr;
-          g += _sunG * glint * sunTg;
-          b += _sunB * glint * sunTb;
-        }
-      }
-    }
-
-    // --- Caustic: floor cells collect the refracted spots from the water
-    // surface above them (drifts with the wave slope). ---
-    if (!inWater &&
-        y > 0 &&
-        (w.at(x, y - 1) == Material.water || water.isSpurtCell(x, y - 1))) {
-      var top = y - 1;
-      while (top > 0 &&
-          (w.at(x, top) == Material.water || water.isSpurtCell(x, top))) {
-        top--;
-      }
-      if (w.at(x, top) == Material.water &&
-          (top == 0 || w.at(x, top - 1) == Material.air)) {
-        final depth = (y - top).toDouble();
-        for (var sxx = x - _causticSpread;
-            sxx <= x + _causticSpread;
-            sxx++) {
-          if (sxx < 0 || sxx >= _w) continue;
-          if (w.at(sxx, top) != Material.water) continue;
-          if (top > 0 && w.at(sxx, top - 1) != Material.air) continue;
-          final (cr, cg, cb, vis) = _march(sxx, top, sx, sy, w, water);
-          if (!vis) continue;
-          final slope = _slope(sxx.toDouble(), tSec);
-          final landX = sxx + slope * _waveAmp * depth;
-          final off = (x - landX) / (_causticSpread * 0.6);
-          final wgt = (1.0 - off * off).clamp(0.0, 1.0);
-          if (wgt <= 0) continue;
-          r += _sunR * _causticK * wgt * cr;
-          g += _sunG * _causticK * wgt * cg;
-          b += _sunB * _causticK * wgt * cb;
-        }
-      }
-    }
-
-    // --- Lamps ---
-    for (final lamp in w.lamps) {
-      if (!lamp.isLit) continue;
-      final ddx = lamp.x - x;
-      final ddy = lamp.y - y;
-      final d2 = ddx * ddx + ddy * ddy;
-      if (d2 > _lampRadius * _lampRadius) continue;
-      final (lr, lg, lb, vis) =
-          _march(x, y, lamp.x.toDouble(), lamp.y.toDouble(), w, water);
-      if (!vis) continue;
-      final falloff = 1.0 / (1.0 + d2 / 144.0);
-      r += _lampR * falloff * lr;
-      g += _lampG * falloff * lg;
-      b += _lampB * falloff * lb;
-    }
-
-    field.sample(i, r, g, b, weight: weight);
-  }
-
-  /// True when the cell is a water surface cell: water (or spurt) with air
-  /// (or the top edge) above it.
-  bool _isWaterSurface(int x, int y, World w) {
-    final m = w.at(x, y);
-    if (m != Material.water) return false;
-    return y == 0 || w.at(x, y - 1) == Material.air;
-  }
-
-  /// The glint lobe in (0, 1] at surface column [x]: a narrow band centred
-  /// on the sun's x, wobbled by the wave slope (the same [Waves] function the
-  /// GUI draws, so the glitter moves with the drawn surface).
-  double _glintLobe(int x, double sx, double tSec) {
-    final center = (x - sx) + _slope(x.toDouble(), tSec) * _glintSlopeCoupling;
-    final v = 1.0 - center * center / (_glintWidth * _glintWidth);
-    return v <= 0 ? 0.0 : v * v;
-  }
-
-  /// The wave slope (d/dx) at column [x] and sim time [tSec].
-  double _slope(double x, double tSec) =>
-      Waves.surface(x + 0.5, tSec) - Waves.surface(x - 0.5, tSec);
-
-  /// March from cell (cx, cy) toward the light at (lx, ly) along the
-  /// straight line between the two cell centres. Returns (tr, tg, tb,
-  /// visible): false for visible when a light-blocking cell is crossed
-  /// (transmittances are then meaningless); otherwise the per-cell
-  /// transmittances of every glass/water cell traversed (the start cell
-  /// and the light cell itself are not attenuated; out-of-grid cells are
-  /// sky and terminate the march unattenuated).
-  ///
-  /// The march is a DDA over the integer grid (Amanatides & Woo): each
-  /// step advances to the next cell the line crosses, exactly one cell
-  /// per grid boundary the line passes. (An earlier version moved one
-  /// cell diagonally per step; on shallow rays that staircase ran up to
-  /// a row above the true line, so a sky cell whose straight line to the
-  /// sun slips past under the roof was blocked, and the whole open sky
-  /// beside the tower went black.)
-  (double, double, double, bool) _march(
-      int cx, int cy, double lx, double ly, World w, Water water) {
-    var tr = 1.0;
-    var tg = 1.0;
-    var tb = 1.0;
-    final dx = lx - cx;
-    final dy = ly - cy;
-    if ((cx - lx).abs() <= 1 && (cy - ly).abs() <= 1) return (1, 1, 1, true);
-    // Ray P(t) = (cx + dx*t, cy + dy*t), t in [0, 1], from the start cell's
-    // centre. The line crosses the first vertical grid line (half a cell
-    // from the centre) at t = 0.5/|dx|, then every 1/|dx| after (horizontal:
-    // 0.5/|dy|, 1/|dy|).
-    final tDeltaX = dx.abs() > 0 ? 1.0 / dx.abs() : double.infinity;
-    final tDeltaY = dy.abs() > 0 ? 1.0 / dy.abs() : double.infinity;
-    var tMaxX = tDeltaX / 2;
-    var tMaxY = tDeltaY / 2;
-    var x = cx;
-    var y = cy;
-    for (var step = 0; step < 1024; step++) {
-      if (tMaxX <= tMaxY) {
-        x += (dx < 0 ? -1 : 1);
-        tMaxX += tDeltaX;
-      } else {
-        y += (dy < 0 ? -1 : 1);
-        tMaxY += tDeltaY;
-      }
-      if ((x - lx).abs() <= 1 && (y - ly).abs() <= 1) {
-        return (tr, tg, tb, true); // reached the light
-      }
-      if (x < 0 || x >= _w || y < 0 || y >= _h) {
-        return (tr, tg, tb, true); // the rest of the path is sky
-      }
-      final m = w.at(x, y);
-      if (Materials.blocksLight(m)) return (0, 0, 0, false);
-      if (m == Material.glass) {
-        tr *= _glassT;
-        tg *= _glassT;
-        tb *= _glassT;
-      } else if (m == Material.water || water.isSpurtCell(x, y)) {
-        tr *= _waterR;
-        tg *= _waterG;
-        tb *= _waterB;
-      }
-    }
-    return (tr, tg, tb, true);
   }
 }
