@@ -95,6 +95,15 @@ class Tracer {
   Set<String>? _prevLampSig;
   int _frame = 0;
 
+  /// The occluder cell list shared by every sweep. Rebuilt only when a
+  /// light-blocking material moves (a spurt change never touches it).
+  List<(int, int)>? _blockers;
+
+  /// The lamp sweeps are valid while the lamp set and the occluders are.
+  /// Rebuilding 120 sweeps per frame costs tens of ms; a settled tower
+  /// rebuilds them only when a lamp moves/toggles or structure changes.
+  bool _lampSweepsValid = false;
+
   /// Trace one frame: diff the world, mark dirty, re-sample dirty cells and
   /// the rotating sun-drift stripe, record the ray count.
   void trace(World w, Water water, Sun sun) {
@@ -108,16 +117,20 @@ class Tracer {
     final firstFrame = _prevMat == null;
     (int, int)? lampFocus;
     final changedCols = <int>{};
+    var matsChanged = false;
     if (firstFrame) {
       // First frame (or after [field.clear]): the whole field is dirty.
       field.clear();
       _spans.rebuildAll(w, water);
+      _blockers = null;
+      _lampSweepsValid = false;
     } else {
       final prevMat = _prevMat!;
       for (var i = 0; i < curMat.length; i++) {
         if (curMat[i] != prevMat[i]) {
           _dirtyBox(i, _margin);
           changedCols.add(i % _w);
+          matsChanged = true;
         }
       }
       final prevSpurt = _prevSpurt!;
@@ -129,6 +142,7 @@ class Tracer {
       }
       final prevLampSig = _prevLampSig!;
       if (!_setEquals(prevLampSig, curLampSig)) {
+        _lampSweepsValid = false;
         final moved = <String>{...prevLampSig, ...curLampSig};
         for (final key in moved) {
           final parts = key.split(':');
@@ -148,14 +162,21 @@ class Tracer {
       for (final c in changedCols) {
         _spans.rebuildColumn(c, w, water);
       }
+      if (matsChanged) {
+        _blockers = null;
+        _lampSweepsValid = false;
+      }
     }
     _prevMat = curMat;
     _prevSpurt = curSpurt;
     _prevLampSig = curLampSig;
 
     final (sx, sy) = Sun.position(sun.timeSec);
-    _buildSunSweep(w, sx, sy);
-    _buildLampSweeps(w);
+    _buildSunSweep(sx, sy);
+    if (!_lampSweepsValid) {
+      _buildLampSweeps(w);
+      _lampSweepsValid = true;
+    }
 
     final transport = Transport(
       _spans,
@@ -223,22 +244,32 @@ class Tracer {
     field.sample(i, r, g, b, weight: weight);
   }
 
-  /// The angular shadow map for the sun at (sx, sy): every light-blocking
-  /// cell is a disc occluder around its centre.
-  void _buildSunSweep(World w, double sx, double sy) {
-    final blockers = <(int, int)>[];
-    for (var x = 0; x < _w; x++) {
-      final runs = _spans.occl[x];
-      for (var s = 0; s < runs.length; s++) {
-        final packed = runs[s];
-        final lo = packed >>> 8;
-        final hi = (packed & 0xFF) + 1;
-        for (var y = lo; y < hi; y++) {
-          blockers.add((x, y));
+  /// Every light-blocking cell as a (x, y) pair, cached across frames.
+  List<(int, int)> _blockersFor() {
+    var b = _blockers;
+    if (b == null) {
+      b = <(int, int)>[];
+      for (var x = 0; x < _w; x++) {
+        final runs = _spans.occl[x];
+        for (var s = 0; s < runs.length; s++) {
+          final packed = runs[s];
+          final lo = packed >>> 8;
+          final hi = (packed & 0xFF) + 1;
+          for (var y = lo; y < hi; y++) {
+            b.add((x, y));
+          }
         }
       }
+      _blockers = b;
     }
-    _sunSweep.build(sx, sy, blockers);
+    return b;
+  }
+
+  /// The angular shadow map for the sun at (sx, sy): every light-blocking
+  /// cell is a disc occluder around its centre. The sun moves every frame,
+  /// so this one sweep is rebuilt every frame (the lamp sweeps are not).
+  void _buildSunSweep(double sx, double sy) {
+    _sunSweep.build(sx, sy, _blockersFor());
   }
 
   /// One sweep per lit lamp (their light is static between world diffs).
@@ -246,18 +277,7 @@ class Tracer {
     _lampSweeps.clear();
     _lampX.clear();
     _lampY.clear();
-    final blockers = <(int, int)>[];
-    for (var x = 0; x < _w; x++) {
-      final runs = _spans.occl[x];
-      for (var s = 0; s < runs.length; s++) {
-        final packed = runs[s];
-        final lo = packed >>> 8;
-        final hi = (packed & 0xFF) + 1;
-        for (var y = lo; y < hi; y++) {
-          blockers.add((x, y));
-        }
-      }
-    }
+    final blockers = _blockersFor();
     for (final lamp in w.lamps) {
       if (!lamp.isLit) continue;
       final sweep = ShadowSweep();
