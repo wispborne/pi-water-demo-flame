@@ -91,10 +91,18 @@ sim state twice as fast as 1× per wall second.
 
 - `trace/field.dart` — light-field state (per-pixel accumulation, convergence,
   dirty tiles).
-- `trace/tracer.dart` — rays from the sun + every lamp step through the grid;
-  water/glass bend and tint by depth (red dies before green); walls cast soft
-  shadows; forward-scattering shafts in water; surface glint gathered toward
-  the sun; caustic on the pool floor.
+- `trace/ray.dart` — per-column contiguous spans of occluder/water/glass
+  cells; a ray's transmittance and first occluder come from the spans it
+  crosses (a ray costs its width in columns, not its length in cells).
+- `trace/shadows.dart` — the per-light angular shadow sweep: every
+  light-blocking cell is a disc occluder around its centre, swept to the
+  first-hit disc per angle; a visibility query is one angle lookup.
+- `trace/surface.dart` + `trace/transport.dart` — one cell's light: direct
+  next events to the sun and the lit lamps (Beer–Lambert through the water
+  spans, red dies before green), forward-scattering shafts in water, the
+  surface glint gathered toward the sun, the caustic on the pool floor from
+  sun rays refracted at the surface.
+- `trace/tracer.dart` — frame driver: world diff, dirty regions, budget.
 - Temporal accumulation (~1 s settle, short lag); dirty-region tracking
   (re-converge only where water moved / a wall broke / a lamp changed).
 - Fallback contract: sustained budget overrun → plain view, toggle off;

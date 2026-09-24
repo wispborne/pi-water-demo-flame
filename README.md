@@ -65,8 +65,12 @@ is a pure-Dart package — headless-testable on any box; the GUI is the
 - `tool/phaseN_dump.dart` — per-phase headless artifacts: pure-Dart ASCII
   dumps of the sim into `out/phaseN/` (e.g. `dart run tool/phase4_dump.dart`).
 - `lib/trace/` — the traced view (Phase 5), pure Dart: `field.dart` (the
-  per-cell light field + the deterministic wave surface) and `tracer.dart`
-  (direct next-event rays, dirty-region re-convergence, ray budget).
+  per-cell light field + the deterministic wave surface), `ray.dart`
+  (per-column scene spans, transmittance, occluder queries), `shadows.dart`
+  (the per-light angular shadow sweep), `surface.dart` (the wave surface and
+  refraction), `transport.dart` (one cell's light: sun/lamp next events,
+  shafts, glint, caustic), and `tracer.dart` (dirty-region re-convergence,
+  ray budget).
 - `test/phase5_test.dart` — the standing checks: light blocked by a
   one-cell partition, light through furniture, roofed-pool surface static
   across the arc, open-pool glint under the sun, settle + local
@@ -156,7 +160,17 @@ hover readout's SPEC 10 strength bar. Verified
 in the running app on Windows: `cd app && flutter run -d windows`.
 macOS desktop support was added on 2026-09-23 (`app/macos/` via
 `flutter create --platforms=macos`, org `com.water_tower`); the app builds
-and runs there with the same 15/15 `flutter test` pass.
+ and runs there with the same 15/15 `flutter test` pass.
+
+**Traced-view engine rewrite (2026-09-24).** The tracer no longer marches
+each sun/lamp ray through the grid cell by cell. Per frame it precomputes
+per-column contiguous spans of occluder/water/glass cells and, per light,
+an angular shadow sweep (each light-blocking cell as a disc occluder,
+swept to the first-hit disc per angle), so a sample is one angle lookup
+plus the geometric length inside the spans (ADR 0003). The traced picture
+is unchanged: all eight standing checks pass unmodified, and a steady
+frame drops to ~7 ms of the 33 ms budget on a 30-floor world with four
+lamps (`tool/trace_bench.dart`).
 
 **Fix (2026-09-24).** A falling lamp's light no longer dies with the
 traced view. The dirty-cell re-convergence pass had no ray-budget cap:
@@ -247,25 +261,31 @@ next-event-estimated light: direct rays to the known lights — the sun (with
 wavelength-dependent Beer–Lambert through water, so deep water reads dark
 blue-green, a forward-scatter shaft, and a specular glint band that follows
 the drawn wave slope) and every lit lamp (warm tungsten, 1/d² falloff) —
-marched cell by cell: structure/ground/wood block, glass tints, furniture
-passes. Rays are deterministic, so one sample is the settled value; a
-changing cell's value is a running mean that re-converges, so a change never
-flashes black. Per frame the tracer diffs the world (grid, spurt overlay,
-lamp positions/states), marks the changed cells dirty plus a margin, and
-spends a fixed 2,500-ray budget: dirty cells re-converge within it, the
-cells nearest a moved lamp first (a fresh field settles in ~0.7 s, a local
-edit re-converges only its box, a falling lamp's light follows with a
+computed from precomputed scene geometry (ADR 0003): per-column contiguous
+spans of occluder/water/glass cells price the ray at the columns it crosses,
+and a per-light angular shadow sweep (each light-blocking cell as a disc
+occluder, swept to a min-heap lower envelope) answers visibility with one
+angle lookup; structure/ground/wood block, glass tints, furniture passes.
+A sample is deterministic, so one is the settled value; a changing cell's
+value is a running mean that re-converges, so a change never flashes black.
+Per frame the tracer diffs the world (grid, spurt overlay, lamp
+positions/states), marks the changed cells dirty plus a margin, and spends
+a fixed 2,500-sample budget: dirty cells re-converge within it, the cells
+nearest a moved lamp first (a fresh field settles in ~0.7 s, a local edit
+re-converges only its box, a falling lamp's light follows with a
 sub-second lag, every other cell bit-identical), and the remainder
 re-means a rotating stripe of undirty cells so the whole field follows the
-drifting sun with a sub-second lag. `TraceBudget` falls back to
-the plain view only on a sustained overrun (a full 2 s window over the cap)
-and recovers on a full window back under it. The standing checks are green:
-lamp light never crosses a solid wall (incl. one-cell partitions), light
-passes through furniture, a roofed pool's surface is static across the
-sun's arc, an open pool glitters brightest under the sun, and a submerged
-lamp reads warm amber. See the artifact: `dart run tool/phase5_dump.dart`
-writes the four standing-check scenes as ASCII light-field frames
-(materials + a luminance ramp) to `out/phase5/`.
+drifting sun with a sub-second lag. A steady frame costs ~7 ms of the
+33 ms budget on a 30-floor world with four lamps (`tool/trace_bench.dart`).
+`TraceBudget` falls back to the plain view only on a sustained overrun (a
+full 2 s window over the cap) and recovers on a full window back under it.
+The standing checks are green: lamp light never crosses a solid wall
+(incl. one-cell partitions), light passes through furniture, a roofed
+pool's surface is static across the sun's arc, an open pool glitters
+brightest under the sun, and a submerged lamp reads warm amber. See the
+artifact: `dart run tool/phase5_dump.dart` writes the four standing-check
+scenes as ASCII light-field frames (materials + a luminance ramp) to
+`out/phase5/`.
 
 **Phase 4 is complete and committed.** The sun disc is a deterministic
 function of sim time: a 420 s cycle, rising from the left, crossing the top
