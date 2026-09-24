@@ -53,12 +53,14 @@ class TraceBudget {
 /// sample, so a change never flashes black and converged cells keep their
 /// value. Per frame the tracer (1) diffs the world (grid materials, the
 /// spurt overlay, lamp positions/states) and marks the changed cells dirty
-/// plus a margin, (2) re-samples every dirty cell, and (3) spends the
-/// remaining ray budget on a rotating stripe of undirty cells so the field
-/// follows the slowly drifting sun — at the 2,500-ray cap that covers the
-/// whole field in ~1 s, which is exactly the settle time the spec asks for.
-/// Steady state on a settled scene costs ~2,500 rays/frame (the stripe) and
-/// never more.
+/// plus a margin, (2) re-samples dirty cells within the frame's ray budget
+/// (a cell the budget leaves behind keeps its last value and re-samples
+/// next frame, so any change settles over ~1 s, the same window as the sun
+/// drift), and (3) spends the remaining budget on a rotating stripe of
+/// undirty cells so the field follows the slowly drifting sun. At the
+/// 2,500-ray cap the stripe covers the whole field in ~1 s, exactly the
+/// settle time the spec asks for. Steady state on a settled scene costs
+/// ~2,500 rays/frame and never more.
 class Tracer {
   final LightField field = LightField();
   final TraceBudget budget = TraceBudget();
@@ -129,7 +131,9 @@ class Tracer {
     final curSpurt = _spurtMask(water);
     final curLampSig = _lampSig(w);
 
-    if (_prevMat == null) {
+    final firstFrame = _prevMat == null;
+    (int, int)? lampFocus;
+    if (firstFrame) {
       // First frame (or after [field.clear]): the whole field is dirty.
       field.clear();
     } else {
@@ -149,6 +153,15 @@ class Tracer {
           _dirtyBox(w.idx(int.parse(parts[0]), int.parse(parts[1])),
               _lampRadius + _margin);
         }
+        // The lamp's new position (its lit state may have changed too): the
+        // pass-1 budget goes to the cells nearest it first.
+        for (final key in curLampSig) {
+          if (!prevLampSig.contains(key)) {
+            final parts = key.split(':');
+            lampFocus = (int.parse(parts[0]), int.parse(parts[1]));
+            break;
+          }
+        }
       }
     }
     _prevMat = curMat;
@@ -158,19 +171,37 @@ class Tracer {
     final (sx, sy) = Sun.position(sun.timeSec);
     var rays = 0;
 
-    // Pass 1: every dirty (never-sampled in this epoch) cell re-converges.
-    for (var i = 0; i < field.w * field.h; i++) {
-      if (field.count(i) == 0) {
-        _sampleCell(i, w, water, sx, sy, sun.timeSec);
-        rays++;
-      }
+    // Pass 1: dirty (never-sampled in this epoch) cells re-converge. The
+    // first frame after a [field.clear] re-samples the whole field in one
+    // go (the one-off spike the budget tolerates); afterwards pass 1 spends
+    // at most the frame's budget, so a big change (a falling lamp) settles
+    // over ~1 s like the sun drift instead of blowing the frame. When a
+    // lamp moved, the cells nearest it are resampled first, so its light
+    // follows radially instead of being swept row by row.
+    final total = field.w * field.h;
+    final dirty = <int>[];
+    for (var i = 0; i < total; i++) {
+      if (field.count(i) == 0) dirty.add(i);
+    }
+    final focus = lampFocus;
+    if (focus != null && dirty.length > 1) {
+      dirty.sort((a, b) {
+        final ax = a % _w - focus.$1, ay = a ~/ _w - focus.$2;
+        final bx = b % _w - focus.$1, by = b ~/ _w - focus.$2;
+        final da = ax * ax + ay * ay, db = bx * bx + by * by;
+        return da == db ? a - b : da - db;
+      });
+    }
+    for (final i in dirty) {
+      if (!firstFrame && rays >= TraceBudget.cap) break;
+      _sampleCell(i, w, water, sx, sy, sun.timeSec);
+      rays++;
     }
 
     // Pass 2: the remaining budget re-means a rotating stripe of undirty
     // cells — the short lag that follows the drifting sun.
     final remaining = TraceBudget.cap - rays;
     if (remaining > 0) {
-      final total = field.w * field.h;
       final stride = (total / remaining).ceil().clamp(1, total);
       for (var k = 0; k < remaining; k++) {
         final i = (k * stride + _frame) % total;

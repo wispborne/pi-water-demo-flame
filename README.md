@@ -158,6 +158,23 @@ macOS desktop support was added on 2026-09-23 (`app/macos/` via
 `flutter create --platforms=macos`, org `com.water_tower`); the app builds
 and runs there with the same 15/15 `flutter test` pass.
 
+**Fix (2026-09-24).** A falling lamp's light no longer dies with the
+traced view. The dirty-cell re-convergence pass had no ray-budget cap:
+each one-cell lamp move dirtied ~20,000 cells around its old and new
+position, costing ~27,000 rays/frame — 10× the 2,500 cap — so any ceiling
+lamp falling for more than 2 s pushed the budget past its fallback, and
+the fallback was permanent (`record()` only runs inside `trace()`, so with
+the traced view off the 2 s recovery window never drained and the Path
+trace toggle stayed dead until the world was rebuilt). Dirty cells now
+re-converge within the frame's ray budget, nearest the moved lamp first
+(its light follows radially and settles in ~1 s, the same window as the
+sun drift), and the first frame after `field.clear()` still re-samples the
+whole field in one go (the one-off spike the budget tolerates). The app
+records 0 rays while the plain view is up, so a fallen-back view
+re-enables on its own. The standing checks are green plus a new one —
+a falling lamp stays inside the ray budget and its light follows
+(`tool/_lampfall.dart` reproduces the scenario headless).
+
 **Fix (2026-09-24).** Breaking the foundation of a large tower froze the
 app: `Structure._detect` ran a component BFS from *every* severed cell
 (its `seen` list was never marked), so a severed section of S cells cost
@@ -235,11 +252,12 @@ passes. Rays are deterministic, so one sample is the settled value; a
 changing cell's value is a running mean that re-converges, so a change never
 flashes black. Per frame the tracer diffs the world (grid, spurt overlay,
 lamp positions/states), marks the changed cells dirty plus a margin, and
-spends a fixed 2,500-ray budget: dirty cells re-converge as the rotating
-sweep reaches them (a fresh field settles in ~0.7 s, a local edit
-re-converges only its box, every other cell bit-identical), and the
-remainder re-means a rotating stripe of undirty cells so the whole field
-follows the drifting sun with a sub-second lag. `TraceBudget` falls back to
+spends a fixed 2,500-ray budget: dirty cells re-converge within it, the
+cells nearest a moved lamp first (a fresh field settles in ~0.7 s, a local
+edit re-converges only its box, a falling lamp's light follows with a
+sub-second lag, every other cell bit-identical), and the remainder
+re-means a rotating stripe of undirty cells so the whole field follows the
+drifting sun with a sub-second lag. `TraceBudget` falls back to
 the plain view only on a sustained overrun (a full 2 s window over the cap)
 and recovers on a full window back under it. The standing checks are green:
 lamp light never crosses a solid wall (incl. one-cell partitions), light

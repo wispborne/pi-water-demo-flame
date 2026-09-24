@@ -221,6 +221,35 @@ void main() {
     expect(t.field.g(iDeep), greaterThan(t.field.b(iDeep)));
   });
 
+  test('a falling lamp stays inside the ray budget and its light follows', () {
+    // A sealed box (the sun stays out) with one lit lamp in mid-air. Drop
+    // it one cell per frame and trace each step: the per-frame ray cost
+    // must stay within the cap (a moving lamp must not push the traced
+    // view into fallback), and the pool of light moves with the lamp.
+    final w = World(_settings, 'phase5');
+    w.fillRect(0, 238, 219, 239, Material.ground);
+    w.fillRect(180, 0, 180, 237, Material.concrete);
+    w.fillRect(210, 0, 210, 237, Material.concrete);
+    w.fillRect(180, 0, 210, 0, Material.concrete);
+    final lamp = Lamp(LampKind.ceiling, 195, 100);
+    w.lamps.add(lamp);
+    final t = Tracer();
+    run(t, w, _sunOff, 30);
+    final startLum = t.field.luminance(w.idx(195, 112)); // 12 below the lamp
+    expect(startLum, greaterThan(0.3));
+    final sim = Sim();
+    sim.sun.timeSec = _sunOff;
+    for (var step = 1; step <= 40; step++) {
+      lamp.y++;
+      t.trace(w, sim.water, sim.sun);
+      expect(t.budget.lastFrameRays, lessThanOrEqualTo(TraceBudget.cap));
+    }
+    // The light moved with the lamp: bright 12 below its new position...
+    expect(t.field.luminance(w.idx(195, 152)), greaterThan(0.3));
+    // ...and dimmed back at the start (the lamp is now 28 cells away).
+    expect(t.field.luminance(w.idx(195, 112)), lessThan(startLum / 2));
+  });
+
   test('ray budget falls back on sustained overrun and recovers', () {
     final b = TraceBudget();
     // A one-off spike does not fall back.

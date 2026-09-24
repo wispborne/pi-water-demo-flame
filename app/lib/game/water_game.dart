@@ -61,6 +61,12 @@ class WaterGame extends FlameGame {
     if (tracedActive) {
       state.tracer.trace(state.world, state.sim.water, state.sim.sun);
       blitter.update(state.tracer.field);
+    } else {
+      // Plain view: the traced cost is zero. Record it so the budget's
+      // 2 s window can run out and the traced view re-enables on its own
+      // (PLAN: budget met again -> re-enable); record() only runs in
+      // trace(), so a fallen-back view would otherwise stay off forever.
+      state.tracer.budget.record(0);
     }
     _frames++;
     _fpsClock += dt;
