@@ -101,11 +101,13 @@ class _WaterAppState extends State<WaterApp> {
                     e.buttons,
                   );
                 },
-                onPointerMove: (e) => widget.game.pointerMove(
-                  e.position.dx,
-                  e.position.dy,
-                  e.buttons,
-                ),
+                onPointerMove: (e) {
+                  widget.game.pointerMove(
+                    e.position.dx,
+                    e.position.dy,
+                    e.buttons,
+                  );
+                },
                 // A button-less mouse move arrives as a hover event, not a
                 // move event; without this the readout only tracked a
                 // pressed drag.
@@ -114,7 +116,9 @@ class _WaterAppState extends State<WaterApp> {
                   e.position.dy,
                   e.buttons,
                 ),
-                onPointerUp: (e) => widget.game.pointerUp(e.buttons),
+                onPointerUp: (e) {
+                  widget.game.pointerUp(e.buttons);
+                },
                 onPointerSignal: (e) {
                   if (e is PointerScrollEvent) {
                     widget.game.scroll(

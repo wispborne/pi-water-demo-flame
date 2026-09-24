@@ -308,8 +308,8 @@ void main() {
     await tester.pump();
 
     // Find an undamaged structural cell whose screen position is clear of
-    // the HUD panels (the top-left readout and the bottom bar swallow
-    // pointer events over their area).
+    // the HUD panel (the top-left panel and the hover readout under it
+    // swallow pointer events over their area).
     int cx = -1, cy = -1;
     outer:
     for (var y = 0; y < Constants.gridH; y++) {
@@ -320,7 +320,7 @@ void main() {
                 core.Materials.of(m).hp) {
           final sx = game.cam.offX + (x + 0.5) * game.cam.cellPx;
           final sy = game.cam.offY + (y + 0.5) * game.cam.cellPx;
-          if (sx < 300 || sy < 100 || sy > 440) continue;
+          if (sx < 348 || sy < 305) continue;
           cx = x;
           cy = y;
           break outer;

@@ -7,8 +7,9 @@ import 'package:water_tower_app/game/water_game.dart';
 import 'package:water_tower_app/sim_state.dart';
 
 /// The HUD (SPEC 10): the counters, the hover readout, the controls, and
-/// the sliders. A Flutter overlay over the game canvas; it reads [SimState]
-/// at 10 Hz (a [Timer]) so it never blocks the render loop.
+/// the sliders. A compact Flutter panel in the top-left corner over the
+/// game canvas; it reads [SimState] at 10 Hz (a [Timer]) so it never
+/// blocks the render loop.
 class HudOverlay extends StatefulWidget {
   const HudOverlay({
     super.key,
@@ -26,6 +27,9 @@ class HudOverlay extends StatefulWidget {
 }
 
 class _HudOverlayState extends State<HudOverlay> {
+  static const double _panelW = 332;
+  static const double _cellW = 154;
+
   late final TextEditingController _seedCtrl;
   final _seedFocus = FocusNode();
   Timer? _debounce;
@@ -63,11 +67,154 @@ class _HudOverlayState extends State<HudOverlay> {
   @override
   Widget build(BuildContext context) {
     final s = widget.state;
-    return Stack(
-      children: [
-        Positioned(top: 8, left: 8, child: _hoverPanel(s)),
-        Positioned(left: 8, right: 8, bottom: 8, child: _bottomBar(s)),
-      ],
+    return Positioned(
+      top: 8,
+      left: 8,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _panel(s),
+          const SizedBox(height: 6),
+          _hoverPanel(s),
+        ],
+      ),
+    );
+  }
+
+  Widget _panel(SimState s) {
+    return Container(
+      width: _panelW,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xE6101828),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'water ${s.waterCount}   damage ${s.damagePercent.toStringAsFixed(1)}%   '
+            'destroyed ${s.world.destroyedCount}   FPS ${widget.game.fps}   '
+            'tool ${s.tool.name}',
+            style: const TextStyle(fontSize: 11, color: Colors.white70),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              _btn(80, s.paused ? 'Resume' : 'Pause', s.togglePause, tip: 'P'),
+              const SizedBox(width: 4),
+              _btn(56, '${s.speedLabel}x', s.cycleSpeed, tip: 'S'),
+              const SizedBox(width: 4),
+              _btn(
+                66,
+                'Reset',
+                () {
+                  s.reset();
+                  widget.game.requestFit();
+                },
+                tip: 'R',
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Row(
+            children: [
+              _btn(
+                100,
+                'New seed',
+                () {
+                  s.newSeed();
+                  _seedCtrl.text = s.seed;
+                  widget.game.requestFit();
+                },
+                tip: 'N',
+              ),
+              const SizedBox(width: 4),
+              _btn(56, 'Glow', s.toggleGlow, tip: 'G', active: s.glow),
+              const SizedBox(width: 4),
+              _btn(122, 'Path trace', s.togglePathTrace, tip: 'T',
+                  active: s.pathTrace),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              SizedBox(
+                width: 168,
+                child: TextField(
+                  controller: _seedCtrl,
+                  focusNode: _seedFocus,
+                  style: const TextStyle(fontSize: 12),
+                  decoration: const InputDecoration(
+                    labelText: 'seed name',
+                    isDense: true,
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  ),
+                  onSubmitted: (v) {
+                    if (v.trim().isNotEmpty) {
+                      s.newSeed(v);
+                      widget.game.requestFit();
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 120,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                        'structure',
+                        style: TextStyle(
+                            fontSize: 10, color: Colors.white70)),
+                    DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: s.settings.material,
+                        isDense: true,
+                        dropdownColor: const Color(0xFF101828),
+                        style: const TextStyle(fontSize: 11),
+                        items: const [
+                          DropdownMenuItem(value: 'concrete', child: Text('concrete')),
+                          DropdownMenuItem(value: 'rebar', child: Text('rebar')),
+                          DropdownMenuItem(value: 'steel', child: Text('steel')),
+                          DropdownMenuItem(value: 'titanium', child: Text('titanium')),
+                        ],
+                        onChanged: (m) => m == null
+                            ? null
+                            : _applySettings(null, null, m),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              _slider('brush', 1, 15, s.tools.brushSize.toDouble(),
+                  (v) => s.setBrush(v.round())),
+              const SizedBox(width: 4),
+              _slider('rain', 0, 40, s.tools.rain.toDouble(),
+                  (v) => s.setRain(v.round())),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Row(
+            children: [
+              _slider('floors', 1, 50, s.settings.floors.toDouble(),
+                  (v) => _applySettings(v.round(), null, null)),
+              const SizedBox(width: 4),
+              _slider('width', 1, 10, s.settings.width.toDouble(),
+                  (v) => _applySettings(null, v.round(), null)),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -87,9 +234,9 @@ class _HudOverlayState extends State<HudOverlay> {
     // (ground/rubble/debris, untouchable) would read as a full green bar.
     final showBar = maxHp < 999 && m != core.Material.air && m != core.Material.water;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: const Color(0xCC101828),
+        color: const Color(0xE6101828),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
@@ -159,160 +306,56 @@ class _HudOverlayState extends State<HudOverlay> {
     );
   }
 
-  Widget _bottomBar(SimState s) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xCC101828),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        children: [
-          SizedBox(
-            height: 36,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'water ${s.waterCount}   damage ${s.damagePercent.toStringAsFixed(1)}%   '
-                    'destroyed ${s.world.destroyedCount}   FPS ${widget.game.fps}   '
-                    'seed ${s.seed}   tool ${s.tool.name}',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  const SizedBox(width: 8),
-                  _btn(s.paused ? 'Resume' : 'Pause', s.togglePause),
-                  const SizedBox(width: 4),
-                  _btn('${s.speedLabel}x', s.cycleSpeed),
-                  const SizedBox(width: 4),
-                  _btn('Reset', () {
-                    s.reset();
-                    widget.game.requestFit();
-                  }),
-                  const SizedBox(width: 4),
-                  _btn('New seed', () {
-                    s.newSeed();
-                    _seedCtrl.text = s.seed;
-                    widget.game.requestFit();
-                  }),
-                  const SizedBox(width: 4),
-                  _btn(s.glow ? 'Glow on' : 'Glow off', s.toggleGlow),
-                  const SizedBox(width: 4),
-                  _btn(
-                    s.pathTrace ? 'Path trace on' : 'Path trace off',
-                    s.togglePathTrace,
-                  ),
-                ],
-              ),
+  /// A compact text button. Material buttons force a 48px layout footprint
+  /// (touch-target input padding), so the button is pinned to a small fixed
+  /// box; the text stays centred in it.
+  Widget _btn(double width, String label, VoidCallback onTap,
+      {String? tip, bool active = false}) {
+    return SizedBox(
+      width: width,
+      height: 24,
+      child: Tooltip(
+        message: tip ?? '',
+        child: TextButton(
+          onPressed: () {
+            onTap();
+            // A tapped button takes keyboard focus; hand it back to the
+            // game so the key shortcuts keep working (SPEC 8).
+            widget.gameFocus.requestFocus();
+          },
+          style: TextButton.styleFrom(
+            padding: EdgeInsets.zero,
+            minimumSize: Size.zero,
+            textStyle: TextStyle(
+              fontSize: 11,
+              color: active ? const Color(0xFF4FD8E8) : null,
             ),
           ),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 68,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(
-                    width: 150,
-                    child: TextField(
-                      controller: _seedCtrl,
-                      focusNode: _seedFocus,
-                      style: const TextStyle(fontSize: 12),
-                      decoration: const InputDecoration(
-                        labelText: 'seed name',
-                        isDense: true,
-                      ),
-                      onSubmitted: (v) {
-                        if (v.trim().isNotEmpty) {
-                          s.newSeed(v);
-                          widget.game.requestFit();
-                        }
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  _slider('brush', 1, 15, s.tools.brushSize.toDouble(),
-                      (v) => s.setBrush(v.round())),
-                  const SizedBox(width: 12),
-                  _slider('rain', 0, 40, s.tools.rain.toDouble(),
-                      (v) => s.setRain(v.round())),
-                  const SizedBox(width: 12),
-                  _slider('floors', 1, 50, s.settings.floors.toDouble(),
-                      (v) => _applySettings(v.round(), null, null)),
-                  const SizedBox(width: 12),
-                  _slider('width', 1, 10, s.settings.width.toDouble(),
-                      (v) => _applySettings(null, v.round(), null)),
-                  const SizedBox(width: 12),
-                  SizedBox(
-                    width: 160,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                            'structure',
-                            style: TextStyle(
-                                fontSize: 11, color: Colors.white70)),
-                        DropdownButton<String>(
-                          value: s.settings.material,
-                          isDense: true,
-                          underline: const SizedBox.shrink(),
-                          dropdownColor: const Color(0xFF101828),
-                          items: const [
-                            DropdownMenuItem(value: 'concrete', child: Text('concrete')),
-                            DropdownMenuItem(value: 'rebar', child: Text('rebar')),
-                            DropdownMenuItem(value: 'steel', child: Text('steel')),
-                            DropdownMenuItem(value: 'titanium', child: Text('titanium')),
-                          ],
-                          onChanged: (m) =>
-                              m == null ? null : _applySettings(null, null, m),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'keys 1-8 tools · P pause · S speed · G glow · T path trace · R reset · N new seed · LMB apply · RMB/MMB pan · wheel/pinch zoom',
-                    style: TextStyle(fontSize: 11, color: Colors.white54),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
+          child: Text(label),
+        ),
       ),
-    );
-  }
-
-  Widget _btn(String label, VoidCallback onTap) {
-    return TextButton(
-      onPressed: () {
-        onTap();
-        // A tapped button takes keyboard focus; hand it back to the game
-        // so the key shortcuts keep working (SPEC 8).
-        widget.gameFocus.requestFocus();
-      },
-      style: TextButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-        minimumSize: const Size(0, 28),
-        textStyle: const TextStyle(fontSize: 12),
-      ),
-      child: Text(label),
     );
   }
 
   Widget _slider(String label, double min, double max, double value,
       ValueChanged<double> onChanged) {
     return SizedBox(
-      width: 120,
+      width: _cellW,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '$label ${value.round()}',
-            style: const TextStyle(fontSize: 11, color: Colors.white70),
+          Row(
+            children: [
+              Text(
+                label,
+                style: const TextStyle(fontSize: 10, color: Colors.white70),
+              ),
+              const Spacer(),
+              Text(
+                value.round().toString(),
+                style: const TextStyle(fontSize: 10),
+              ),
+            ],
           ),
           Slider(
             min: min,
@@ -331,4 +374,3 @@ class _HudOverlayState extends State<HudOverlay> {
 Tool? toolForKey(int key) => key >= 1 && key <= 8
     ? Tool.values[key - 1]
     : null;
-
