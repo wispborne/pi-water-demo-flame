@@ -162,8 +162,8 @@ class GridPainter {
     // Damaged structure: a darkening overlay scaled by the missing hp.
     for (var i = 0; i < w.cells.length; i++) {
       final m = w.cells[i];
-      if (!Materials.structure.contains(m)) continue;
-      final maxHp = Materials.of(m).hp;
+      if (!Materials.structureByIndex[m.index]) continue;
+      final maxHp = Materials.hpByIndex[m.index];
       final hp = w.strength[i];
       if (hp >= maxHp) continue;
       final x = i % W;

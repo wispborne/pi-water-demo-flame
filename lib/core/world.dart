@@ -73,7 +73,7 @@ class World {
   int countStructural() {
     var n = 0;
     for (final m in cells) {
-      if (Materials.structure.contains(m)) n++;
+      if (Materials.structureByIndex[m.index]) n++;
     }
     return n;
   }

@@ -52,6 +52,25 @@ class Buoyancy {
   /// The loose objects currently in the world (rebuilt by [resync]).
   final List<LooseObject> objects = [];
 
+  /// "Seen this resync" stamp per cell (a flat array beats a fresh boolean
+  /// list per tick: no allocation).
+  final List<int> _seen;
+  int _seenGen = 0;
+
+  /// Reusable furniture-component worklist.
+  final List<int> _comp = [];
+
+  Buoyancy() : _seen = List.filled(Constants.gridW * Constants.gridH, 0);
+
+  int _nextSeenGen() {
+    _seenGen++;
+    if (_seenGen == 0) {
+      _seen.fillRange(0, _seen.length, 0);
+      _seenGen = 1;
+    }
+    return _seenGen;
+  }
+
   /// Rebuild [objects] from the grid: each furniture piece (its 4-connected
   /// same-material cells) and each free lamp. A ceiling lamp is released
   /// (fixed -> free) when the slab above it has broken — i.e. the cell
@@ -60,13 +79,15 @@ class Buoyancy {
     objects.clear();
     const W = Constants.gridW;
     final H = Constants.gridH;
-    final seen = List.filled(w.cells.length, false);
-    for (var i = 0; i < w.cells.length; i++) {
-      if (seen[i]) continue;
-      final m = w.cells[i];
+    final cells = w.cells;
+    final seen = _seen;
+    final seenGen = _nextSeenGen();
+    for (var i = 0; i < cells.length; i++) {
+      if (seen[i] == seenGen) continue;
+      final m = cells[i];
       final x = i % W, y = i ~/ W;
       if (m == Material.lamp) {
-        seen[i] = true;
+        seen[i] = seenGen;
         var lampIndex = -1;
         for (var k = 0; k < w.lamps.length; k++) {
           final l = w.lamps[k];
@@ -76,8 +97,8 @@ class Buoyancy {
           }
         }
         if (lampIndex >= 0 && w.lamps[lampIndex].state == LampState.fixed) {
-          final above = y > 0 ? w.cells[i - W] : Material.air;
-          if (Materials.structure.contains(above)) continue; // still fixed
+          final above = y > 0 ? cells[i - W] : Material.air;
+          if (Materials.structureByIndex[above.index]) continue; // fixed
           w.lamps[lampIndex].state = LampState.free; // its ceiling broke
         }
         objects.add(LooseObject(m, x, y, 1, 1, lampIndex: lampIndex));
@@ -86,8 +107,9 @@ class Buoyancy {
       if (!Materials.isFurniture(m)) continue;
       // 4-connected same-material mass (a furniture piece).
       var minx = x, maxx = x, miny = y, maxy = y;
-      final comp = <int>[i];
-      seen[i] = true;
+      final comp = _comp..clear();
+      comp.add(i);
+      seen[i] = seenGen;
       for (var b = 0; b < comp.length; b++) {
         final j = comp[b];
         final cx = j % W, cy = j ~/ W;
@@ -99,8 +121,8 @@ class Buoyancy {
           final nx = cx + d.$1, ny = cy + d.$2;
           if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
           final ni = ny * W + nx;
-          if (seen[ni] || w.cells[ni] != m) continue;
-          seen[ni] = true;
+          if (seen[ni] == seenGen || cells[ni] != m) continue;
+          seen[ni] = seenGen;
           comp.add(ni);
         }
       }

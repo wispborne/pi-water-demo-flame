@@ -72,11 +72,31 @@ class Water {
   /// The spurt column per grid column (the jet's held column, an overlay).
   final List<Spurt> spurts;
 
+  /// "Seen this body pass" stamp per cell (a flat array beats a fresh
+  /// boolean list per tick: no allocation, no boxing).
+  final List<int> _seen;
+  int _seenGen = 0;
+
+  /// Reusable body worklist and per-column surface rows (-1 = none).
+  final List<int> _body = [];
+  final List<int> _surf;
+
   Water()
     : momentum = List.filled(Constants.gridW * Constants.gridH, 0),
       head = List.filled(Constants.gridW * Constants.gridH, 0),
       bodyHead = List.filled(Constants.gridW * Constants.gridH, 0),
-      spurts = [for (var i = 0; i < Constants.gridW; i++) Spurt()];
+      spurts = [for (var i = 0; i < Constants.gridW; i++) Spurt()],
+      _seen = List.filled(Constants.gridW * Constants.gridH, 0),
+      _surf = List.filled(Constants.gridW, -1);
+
+  int _nextSeenGen() {
+    _seenGen++;
+    if (_seenGen == 0) {
+      _seen.fillRange(0, _seen.length, 0);
+      _seenGen = 1;
+    }
+    return _seenGen;
+  }
 
   /// The total water volume: the grid's water plus the spurt overlay's cells
   /// (a spurt's cells are out of the grid; counting them keeps volume
@@ -117,16 +137,18 @@ class Water {
     const W = Constants.gridW;
     final H = Constants.gridH;
     final colMaxHead = List.filled(W, 0);
-    final seen = List.filled(w.cells.length, false);
-    for (var i = 0; i < w.cells.length; i++) {
-      if (seen[i] || w.cells[i] != Material.water) continue;
+    final cells = w.cells;
+    final seen = _seen;
+    final seenGen = _nextSeenGen();
+    final surf = _surf..fillRange(0, W, -1);
+    for (var i = 0; i < cells.length; i++) {
+      if (seen[i] == seenGen || cells[i] != Material.water) continue;
       // One connected body (the grid's water; spurt cells are out of the
       // grid, in the overlay). BFS flood fill over the 4-neighbour grid.
-      final body = <int>[i];
-      seen[i] = true;
+      final body = _body..clear();
+      body.add(i);
+      seen[i] = seenGen;
       var top = H, bottom = 0;
-      // The topmost cell per column (the body surface).
-      final surf = <int, int>{};
       for (var b = 0; b < body.length; b++) {
         final idx = body[b];
         final y = idx ~/ W;
@@ -134,14 +156,14 @@ class Water {
         if (y < top) top = y;
         if (y > bottom) bottom = y;
         final s = surf[x];
-        if (s == null || y < s) surf[x] = y;
+        if (s == -1 || y < s) surf[x] = y;
         // Expand to 4-neighbour water cells.
         for (final d in const [(1, 0), (-1, 0), (0, 1), (0, -1)]) {
           final nx = x + d.$1, ny = y + d.$2;
           if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
           final ni = ny * W + nx;
-          if (seen[ni] || w.cells[ni] != Material.water) continue;
-          seen[ni] = true;
+          if (seen[ni] == seenGen || cells[ni] != Material.water) continue;
+          seen[ni] = seenGen;
           body.add(ni);
         }
       }
@@ -150,7 +172,7 @@ class Water {
       for (final idx in body) {
         final x = idx % W;
         final s = surf[x];
-        head[idx] = s == null ? 0 : (idx ~/ W - s); // depth below the surface
+        head[idx] = s == -1 ? 0 : (idx ~/ W - s); // depth below the surface
         bodyHead[idx] = maxHead;
         if (maxHead > colMaxHead[x]) colMaxHead[x] = maxHead;
       }
@@ -158,15 +180,19 @@ class Water {
       // A jet needs a confined body: at least one surface column covered
       // by a real wall (furniture and rubble do not count — they move).
       var confined = false;
-      for (final e in surf.entries) {
-        final sx = e.key, sy = e.value;
-        if (sy > 0 && Materials.blocksWater(w.at(sx, sy - 1))) {
+      for (var x = 0; x < W; x++) {
+        final sy = surf[x];
+        if (sy > 0 &&
+            Materials.blocksWaterByIndex[cells[(sy - 1) * W + x].index]) {
           confined = true;
           break;
         }
       }
       if (maxHead >= Constants.jetMinHead && confined) {
         _jets(w, surf, maxHead);
+      }
+      for (var x = 0; x < W; x++) {
+        if (surf[x] != -1) surf[x] = -1;
       }
     }
     // Release any spurt whose column is no longer deep enough (its cells
@@ -195,27 +221,30 @@ class Water {
   /// strength 1 it crumbles (becoming water: its mass joins the body, so
   /// volume is conserved by displacement, never by duplication).
   void _erode(World w, List<int> body, int maxHead) {
+    const W = Constants.gridW;
+    final H = Constants.gridH;
+    final cells = w.cells;
+    final strength = w.strength;
     for (final idx in body) {
-      final x = idx % Constants.gridW, y = idx ~/ Constants.gridW;
+      final x = idx % W, y = idx ~/ W;
       for (final d in const [(1, 0), (-1, 0), (0, 1), (0, -1)]) {
         final nx = x + d.$1, ny = y + d.$2;
-        if (nx < 0 ||
-            nx >= Constants.gridW ||
-            ny < 0 ||
-            ny >= Constants.gridH) {
+        if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
+        final n = ny * W + nx;
+        final m = cells[n];
+        final mi = m.index;
+        if (!Materials.blocksWaterByIndex[mi] ||
+            m == Material.ground) {
           continue;
         }
-        final n = ny * Constants.gridW + nx;
-        final m = w.cells[n];
-        if (!Materials.blocksWater(m) || m == Material.ground) continue;
-        if (maxHead <= Materials.of(m).tolerance) continue;
-        final hp = w.strength[n];
+        if (maxHead <= Materials.toleranceByIndex[mi]) continue;
+        final hp = strength[n];
         if (hp <= 1) {
-          w.strength[n] = 0;
-          w.cells[n] = Material.water;
+          strength[n] = 0;
+          cells[n] = Material.water;
           w.destroyedCount++;
         } else {
-          w.strength[n] = hp - 1;
+          strength[n] = hp - 1;
         }
       }
     }
@@ -229,12 +258,12 @@ class Water {
   /// of the grid into the spurt (volume-conserved); the pool surface drops
   /// (falling-sand water cannot rise). A spurt blocked by a wall stops
   /// growing but stays held; a spurt at the cap stays held.
-  void _jets(World w, Map<int, int> surf, int maxHead) {
+  void _jets(World w, List<int> surf, int maxHead) {
     final cap = maxHead ~/ 2;
     final capH = cap > Constants.jetMaxHeight ? Constants.jetMaxHeight : cap;
-    final cols = surf.keys.toList()..sort();
-    for (final x in cols) {
-      final y0 = surf[x]!; // the body surface row in this column
+    for (var x = 0; x < surf.length; x++) {
+      final y0 = surf[x];
+      if (y0 == -1) continue; // no body surface in this column
       // The crack must be open above the surface (a wall blocks the jet).
       if (y0 > 0 && !_canEnter(w.at(x, y0 - 1))) continue;
       final s = spurts[x];

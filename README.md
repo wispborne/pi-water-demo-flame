@@ -158,6 +158,19 @@ macOS desktop support was added on 2026-09-23 (`app/macos/` via
 `flutter create --platforms=macos`, org `com.water_tower`); the app builds
 and runs there with the same 15/15 `flutter test` pass.
 
+**Fix (2026-09-24).** Breaking the foundation of a large tower froze the
+app: `Structure._detect` ran a component BFS from *every* severed cell
+(its `seen` list was never marked), so a severed section of S cells cost
+O(S²) per tick for the whole 60-tick slump — ~3 s/tick, and a 2–3 minute
+hard freeze, on a 50-floor tower. A section is now stamped as it is found
+(one BFS per section), the support BFS runs once per tick and is shared by
+detection and release, and the per-cell bookkeeping moved from `Set<int>`/
+`Set<Material>`/`Map` lookups to flat index tables (`Materials.*ByIndex`)
+and reusable stamp arrays in `Structure`, `Water`, and `Buoyancy`. The
+collapse now costs ~3 ms/tick at worst (bit-identical world state to the
+old code across a 121-tick A/B run of the same collapse; `tool/
+_collapsebench.dart` reproduces the scenario and times it).
+
 **Fix (2026-09-23).** Trackpad pinch zoom and two-finger pan did nothing
 on macOS: the macOS embedder delivers *both* as `panZoomStart/Update/End`
 pointer changes (with a cumulative `scale` and a per-event `panDelta`),

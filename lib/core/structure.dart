@@ -11,37 +11,74 @@ import 'world.dart';
 /// structural cell resting directly on ground, through structural cells,
 /// where a vertical gap of up to `severGap - 1` (2) air cells bridges. A
 /// disconnected component is a severed section: it slumps for
-/// [Constants.slumpTicks], then breaks — structure -> rubble, wood -> debris
-/// — and the broken cells fall as loose objects (see `loose.dart`).
+/// [Constants.slumpTicks], then breaks — structure -> rubble, wood -> debris —
+/// and the broken cells fall as loose objects (see `loose.dart`).
+///
+/// Cost: one full-grid support BFS per tick, with per-cell work as a flat
+/// array lookup — a severed section of S cells costs O(S), not O(S^2).
 class Structure {
   /// Slumping sections: deterministic section id (the component's minimum
   /// cell index) -> ticks remaining before release.
   final Map<int, int> slumping = {};
 
-  /// One structural tick: detect newly severed sections (start their slump)
-  /// and advance active slumps (release into rubble when the timer elapses).
-  void tick(World w) {
-    _detect(w);
-    _advance(w);
+  /// "Supported this tick" stamp per cell (a flat array beats a fresh
+  /// Set<int> per tick: no hashing, no allocation).
+  final List<int> _sup = List.filled(Constants.gridW * Constants.gridH, 0);
+  int _supGen = 0;
+
+  /// "Already in a detected component" stamp per cell, so a severed section
+  /// is found once per tick, not once per cell.
+  final List<int> _seen = List.filled(Constants.gridW * Constants.gridH, 0);
+  int _seenGen = 0;
+
+  /// Reusable BFS worklists.
+  final List<int> _stack = [];
+  final List<int> _comp = [];
+
+  void _nextSupGen() {
+    _supGen++;
+    if (_supGen == 0) {
+      _sup.fillRange(0, _sup.length, 0);
+      _supGen = 1;
+    }
   }
 
-  /// Structural cells connected to the foundation.
-  Set<int> _supported(World w) {
+  int _nextSeenGen() {
+    _seenGen++;
+    if (_seenGen == 0) {
+      _seen.fillRange(0, _seen.length, 0);
+      _seenGen = 1;
+    }
+    return _seenGen;
+  }
+
+  /// One structural tick: the support BFS runs once, then newly severed
+  /// sections start their slump and active slumps advance (release into
+  /// rubble when the timer elapses).
+  void tick(World w) {
+    _nextSupGen();
+    final supGen = _supGen;
+    _supported(w, supGen);
+    _detect(w, supGen);
+    _advance(w, supGen);
+  }
+
+  /// Structural cells connected to the foundation, stamped into [_sup] with
+  /// [supGen].
+  void _supported(World w, int supGen) {
     const W = Constants.gridW;
     final H = Constants.gridH;
-    final out = <int>{};
-    final stack = <int>[];
-    for (var y = 0; y < H; y++) {
-      for (var x = 0; x < W; x++) {
-        final i = y * W + x;
-        if (!Materials.structure.contains(w.cells[i]) || out.contains(i)) {
-          continue;
-        }
-        final below = y + 1 < H ? w.cells[i + W] : Material.air;
-        if (below != Material.ground) continue;
-        out.add(i);
-        stack.add(i);
+    final cells = w.cells;
+    final sup = _sup;
+    final stack = _stack..clear();
+    for (var i = 0; i < cells.length; i++) {
+      if (!Materials.structureByIndex[cells[i].index] || sup[i] == supGen) {
+        continue;
       }
+      final below = i + W < cells.length ? cells[i + W] : Material.air;
+      if (below != Material.ground) continue;
+      sup[i] = supGen;
+      stack.add(i);
     }
     while (stack.isNotEmpty) {
       final i = stack.removeLast();
@@ -51,10 +88,11 @@ class Structure {
         final nx = x + d.$1, ny = y + d.$2;
         if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
         final ni = ny * W + nx;
-        if (out.contains(ni) || !Materials.structure.contains(w.cells[ni])) {
+        if (sup[ni] == supGen ||
+            !Materials.structureByIndex[cells[ni].index]) {
           continue;
         }
-        out.add(ni);
+        sup[ni] = supGen;
         stack.add(ni);
       }
       // Vertical gap bridge (both directions): up to severGap-1 (2) air
@@ -66,42 +104,49 @@ class Structure {
           if (ny < 0 || ny >= H) break;
           var gap = true;
           for (var g = 1; g < k; g++) {
-            if (w.cells[(y + sign * g) * W + x] != Material.air) {
+            if (cells[(y + sign * g) * W + x] != Material.air) {
               gap = false;
               break;
             }
           }
           if (!gap) continue;
           final ni = ny * W + x;
-          if (out.contains(ni) || !Materials.structure.contains(w.cells[ni])) {
+          if (sup[ni] == supGen ||
+              !Materials.structureByIndex[cells[ni].index]) {
             continue;
           }
-          out.add(ni);
+          sup[ni] = supGen;
           stack.add(ni);
         }
       }
     }
-    return out;
   }
 
-  /// Severed (unsupported) sections start their slump timer.
-  void _detect(World w) {
-    final supported = _supported(w);
-    final seen = List.filled(w.cells.length, false);
-    for (var i = 0; i < w.cells.length; i++) {
-      if (seen[i] ||
-          !Materials.structure.contains(w.cells[i]) ||
-          supported.contains(i)) {
+  /// Severed (unsupported) sections start their slump timer. Each severed
+  /// cell is visited once per tick: a found component is stamped, so a
+  /// section of S cells costs one BFS of O(S), not S BFS of O(S).
+  void _detect(World w, int supGen) {
+    final seenGen = _nextSeenGen();
+    final cells = w.cells;
+    final seen = _seen;
+    final sup = _sup;
+    for (var i = 0; i < cells.length; i++) {
+      if (seen[i] == seenGen ||
+          !Materials.structureByIndex[cells[i].index] ||
+          sup[i] == supGen) {
         continue;
       }
-      final comp = _component(w, i, supported);
+      final comp = _component(w, i, supGen, seenGen);
       slumping.putIfAbsent(comp.first, () => Constants.slumpTicks);
+      for (final j in comp) {
+        seen[j] = seenGen;
+      }
     }
   }
 
   /// Active slumps decrement; at zero the section breaks into rubble/debris.
   /// A section that regains support (re-braced during the slump) is saved.
-  void _advance(World w) {
+  void _advance(World w, int supGen) {
     for (final id in slumping.keys.toList()) {
       final left = slumping[id]! - 1;
       if (left > 0) {
@@ -109,7 +154,7 @@ class Structure {
         continue;
       }
       slumping.remove(id);
-      final comp = _component(w, id, _supported(w));
+      final comp = _component(w, id, supGen, _nextSeenGen());
       if (comp.isEmpty) continue; // released or saved
       for (final i in comp) {
         final m = w.cells[i];
@@ -121,17 +166,21 @@ class Structure {
   }
 
   /// The unsupported structural component containing [i] (4-neighbour
-  /// connectivity; gaps do not connect severed parts), identified by its
-  /// minimum cell index. Empty when [i] is no longer an unsupported
-  /// structural cell.
-  List<int> _component(World w, int i, Set<int> supported) {
+  /// connectivity; gaps do not connect severed parts), in the reused
+  /// [_comp] list, led by [i] (the minimum cell, since callers scan
+  /// row-major). Empty when [i] is no longer an unsupported structural cell.
+  List<int> _component(World w, int i, int supGen, int seenGen) {
     const W = Constants.gridW;
     final H = Constants.gridH;
-    if (!Materials.structure.contains(w.cells[i]) || supported.contains(i)) {
-      return const [];
+    final cells = w.cells;
+    final sup = _sup;
+    final seen = _seen;
+    final comp = _comp..clear();
+    if (!Materials.structureByIndex[cells[i].index] || sup[i] == supGen) {
+      return comp;
     }
-    final seen = <int>{i};
-    final comp = <int>[i];
+    comp.add(i);
+    seen[i] = seenGen;
     for (var b = 0; b < comp.length; b++) {
       final j = comp[b];
       final x = j % W, y = j ~/ W;
@@ -139,12 +188,12 @@ class Structure {
         final nx = x + d.$1, ny = y + d.$2;
         if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
         final ni = ny * W + nx;
-        if (seen.contains(ni) ||
-            !Materials.structure.contains(w.cells[ni]) ||
-            supported.contains(ni)) {
+        if (seen[ni] == seenGen ||
+            sup[ni] == supGen ||
+            !Materials.structureByIndex[cells[ni].index]) {
           continue;
         }
-        seen.add(ni);
+        seen[ni] = seenGen;
         comp.add(ni);
       }
     }

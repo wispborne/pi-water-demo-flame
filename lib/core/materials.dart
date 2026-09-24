@@ -72,8 +72,6 @@ class Materials {
     Material.lamp: const MaterialProps(-1, 3, true),
   };
 
-  static MaterialProps of(Material m) => props[m]!;
-
   /// Structure materials: the tower's walls, slabs, partitions, roof.
   static const Set<Material> structure = {
     Material.concrete,
@@ -95,20 +93,48 @@ class Materials {
     Material.sofa,
   };
 
-  /// Wall class (SPEC section 3): blocks water and light.
-  static bool blocksWater(Material m) =>
+  // Material-indexed fast tables for the hot per-cell loops (a List lookup
+  // instead of a Set/Map hash): built once from the sets above.
+  static final List<bool> structureByIndex =
+      [for (final m in Material.values) structure.contains(m)];
+  static final List<bool> furnitureByIndex =
+      [for (final m in Material.values) furnitureTypes.contains(m)];
+  static final List<bool> blocksWaterByIndex = [
+    for (final m in Material.values)
       structure.contains(m) ||
-      m == Material.ground ||
-      m == Material.wood ||
-      m == Material.glass;
+          m == Material.ground ||
+          m == Material.wood ||
+          m == Material.glass
+  ];
+  static final List<bool> blocksLightByIndex = [
+    for (final m in Material.values)
+      structure.contains(m) || m == Material.ground || m == Material.wood
+  ];
+  static final List<int> toleranceByIndex =
+      [for (final m in Material.values) props[m]!.tolerance];
+  static final List<int> hpByIndex =
+      [for (final m in Material.values) props[m]!.hp];
+
+  /// The material's water-erosion tolerance (-1 = never erodes).
+  static int tolerance(Material m) => toleranceByIndex[m.index];
+
+  /// The material's tool-damage hp.
+  static int hp(Material m) => hpByIndex[m.index];
+
+  /// True when [m] is a structure material.
+  static bool isStructure(Material m) => structureByIndex[m.index];
+
+  static MaterialProps of(Material m) => props[m]!;
+
+  /// Wall class (SPEC section 3): blocks water and light.
+  static bool blocksWater(Material m) => blocksWaterByIndex[m.index];
 
   /// Wall class: blocks light. Glass blocks water but is transparent to light.
-  static bool blocksLight(Material m) =>
-      structure.contains(m) || m == Material.ground || m == Material.wood;
+  static bool blocksLight(Material m) => blocksLightByIndex[m.index];
 
   /// Pass-through to water: all furniture, rubble, debris, water, lamp.
   static bool passThroughWater(Material m) =>
-      furnitureTypes.contains(m) ||
+      furnitureByIndex[m.index] ||
       m == Material.rubble ||
       m == Material.debris ||
       m == Material.water ||
@@ -128,7 +154,7 @@ class Materials {
     Material.sofa: (3, 1),
   };
 
-  static bool isFurniture(Material m) => furnitureTypes.contains(m);
+  static bool isFurniture(Material m) => furnitureByIndex[m.index];
 
   static bool floats(Material m) => of(m).floats;
 
@@ -136,7 +162,7 @@ class Materials {
   /// becomes sinking rubble; everything else that can break (furniture,
   /// wood, glass, lamps) becomes floating debris.
   static Material breaksInto(Material m) =>
-      structure.contains(m) ? Material.rubble : Material.debris;
+      structureByIndex[m.index] ? Material.rubble : Material.debris;
 
   static int clampPoolFill(int poolDepth) => min(Constants.poolFill, poolDepth);
 }
