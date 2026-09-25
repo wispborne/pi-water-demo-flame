@@ -5,9 +5,10 @@
 > (design, code, tests, debugging) on the developer's own machine, and every
 > line of code in this repo is locally generated.
 
-A seeded 2D side-view water simulation with physically traced light. A tower
-is built beside a pool; the structure fails cell by cell under water,
-pressure, and user attack, and light is genuinely transported.
+A seeded 2D side-view water simulation with an optional physically traced
+light view (off by default, ADR 0004). A tower is built beside a pool; the
+structure fails cell by cell under water, pressure, and user attack, and in
+the traced view light is genuinely transported.
 
 Built in Flutter/Flame (desktop) on a pure-Dart core. The simulation itself
 is a pure-Dart package — headless-testable on any box; the GUI is the
@@ -145,8 +146,8 @@ app (`app/`) over the pure-Dart core. The camera fits the whole world at
 load and after Reset / New seed; left-drag applies the selected tool,
 right- or middle-drag pans, and the wheel and trackpad pinch zoom around
 the cursor. The
-traced view is on by default: the 220×240 light field is blitted each
-frame and the scene is lit only by that field; a sustained ray-budget
+traced view is off by default (ADR 0004): when on, the 220×240 light field
+is blitted each frame and the scene is lit only by that field; a sustained ray-budget
 overrun drops to the plain view and re-enables on recovery. The HUD (10
 Hz) shows the counters
 (water cells, damage %, destroyed cells, FPS), the hover readout

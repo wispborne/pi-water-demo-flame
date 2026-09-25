@@ -1,6 +1,6 @@
 # 30 Floors & a Pool — Product Specification
 
-A 2D side-view (cutaway) interactive desktop program: a multi-storey tower built from a grid of square cells, sitting beside a pool of water. Water floods the structure; the structure fails cell by cell under water, pressure, and user attack; loose items float or sink. The scene is lit by two modes: a plain day-sky view, and the traced view (the default), where light is genuinely transported through air, water, and glass.
+A 2D side-view (cutaway) interactive desktop program: a multi-storey tower built from a grid of square cells, sitting beside a pool of water. Water floods the structure; the structure fails cell by cell under water, pressure, and user attack; loose items float or sink. The scene is lit by two modes: a plain day-sky view (the default), and the traced view, where light is genuinely transported through air, water, and glass.
 
 Terminology follows `CONTEXT.md`; decisions of record live in `docs/adr/`.
 
@@ -73,7 +73,7 @@ Terminology follows `CONTEXT.md`; decisions of record live in `docs/adr/`.
 - **Sun**: a warm disc in the day sky; a **full cycle of ~7 minutes** — rise, arc up and down across the sky (passing behind the tower), set, then immediately loops. Pausing the world freezes the sun. The scene never goes dark.
 - **Glow** (decorative, separate from lighting, toggleable, on by default): a soft brighter band along the water surface with a slow wave of brightness and occasional bright crests. Purely visual — it never affects physics.
 
-## 7. Traced view (default on, toggleable)
+## 7. Traced view (default off, toggleable)
 
 - The scene is lit **only by traced light** — no ambient, no overlay. The sun and every lamp are real light sources.
 - Light bounces off surfaces; **water and glass bend and tint it** the deeper it goes (red dies before green); walls cast soft shadows.

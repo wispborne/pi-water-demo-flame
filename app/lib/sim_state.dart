@@ -36,7 +36,7 @@ class SimState {
     sim.speedScale = speedScale;
   }
   bool glow = true;
-  bool pathTrace = true; // the traced view (SPEC 7: default on)
+  bool pathTrace = false; // the traced view (SPEC 7: default off, ADR 0004)
 
   double fps = 0;
 

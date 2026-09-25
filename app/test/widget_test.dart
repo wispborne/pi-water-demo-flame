@@ -117,7 +117,7 @@ void main() {
   test('traced view falls back on budget overrun and re-enables on recovery', () {
     final s = SimState('seed-42');
     final game = WaterGame(s);
-    expect(s.pathTrace, isTrue);
+    s.pathTrace = true;
     expect(game.tracedActive, isTrue);
 
     // Simulate a sustained overrun: the budget falls back.
