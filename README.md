@@ -170,6 +170,17 @@ macOS desktop support was added on 2026-09-23 (`app/macos/` via
  light-field blit, and the HUD buttons are filled with the hover readout
  showing a material swatch.
 
+**Fix (2026-09-25).** The pool's surface line gapped out under every
+falling drop in its column: the column scan stopped at the first water
+cell, so a drop above the pool took the column's only surface point and
+the pool lost its line where the drop passed. The scan now walks the
+column's water runs top-down and takes the top of the first at-rest run,
+so a drop above the pool keeps the pool's point and a drop in open sky
+gets no point at all. `tool/_raincheck.dart` checks the scan against all
+four column shapes (drop + pool, open-sky drop, plain pool, pool split
+by a sinking grain); `out/rain_pools.png` shows the pool line continuous
+under the falling drops.
+
 **Fix (2026-09-25).** The rain lines came back on damaged towers: the
 surface line connected a point in one column to the point in the
 neighbouring column no matter the vertical distance, so any flagged

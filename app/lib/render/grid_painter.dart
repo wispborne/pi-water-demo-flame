@@ -335,15 +335,15 @@ class GridPainter {
   /// The wavy water-surface line (SPEC 7) and the decorative glow band
   /// (SPEC 9). The wave is the core's [Waves.surface], so the drawn line
   /// moves with the traced glint and caustic. Only at-rest water gets a
-  /// surface: a falling column (rain, a pour, a pour-off sheet) has open
-  /// air under its top cell, a grain (rubble, debris, furniture, lamp)
-  /// under it sinks or floats out of the water on the next buoyancy
-  /// pass, so only water or a permanent wall under the top cell counts
-  /// as support. A real surface changes level by at most a cell between
-  /// neighbouring columns (water levels out sideways), so a jump bigger
-  /// than that — a flagged mid-sky point next to a pool, a jet spurt
-  /// above its pool, a cliff between two levels — starts a new subpath
-  /// instead of drawing a chord across the gap.
+  /// surface: a water run counts as at rest when its bottom cell has
+  /// water or a permanent wall under it (open air under it = falling
+  /// rain, pour, pour-off sheet; a mobile grain under it sinks or
+  /// floats out on the next buoyancy pass), so a falling drop above the
+  /// pool keeps the pool's own surface point. A real surface changes
+  /// level by at most a cell between neighbouring columns (water levels
+  /// out sideways), so a jump bigger than that — a jet spurt above its
+  /// pool, a cliff between two levels — starts a new subpath instead of
+  /// drawing a chord across the gap.
   static void _drawSurface(
     Canvas c,
     World w,
@@ -365,27 +365,34 @@ class GridPainter {
       if (s.active) {
         surf = s.top;
       } else {
+        // Scan the column's water runs top-down and take the top of the
+        // first at-rest run. A run is at rest when its bottom cell has
+        // water or a permanent wall under it: open air under the bottom
+        // = falling (rain, pour, pour-off sheet), and a mobile grain
+        // (rubble, debris, furniture, lamp) under it sinks or floats out
+        // on the next buoyancy pass. A falling drop above the pool must
+        // not take the column's point, or the pool's surface line gaps
+        // out under every passing drop.
         surf = -1;
-        for (var y = 0; y < Constants.gridH; y++) {
-          if (w.at(x, y) == Material.water) {
-            final above = y > 0 ? w.at(x, y - 1) : Material.air;
-            if (above != Material.water) {
-              // At rest: water or a permanent wall under the top cell.
-              // Open air = falling (rain, pour, pour-off sheet). A
-              // mobile grain (rubble, debris, furniture, lamp) is not
-              // support: it sinks or floats out of the water on the
-              // next buoyancy pass, and the falling drop above it would
-              // otherwise draw a surface line to the ground.
-              final below = y + 1 < Constants.gridH
-                  ? w.at(x, y + 1)
-                  : Material.ground;
-              if (below == Material.water ||
-                  Materials.blocksWaterByIndex[below.index]) {
-                surf = y;
-              }
-            }
-            break;
+        var y = 0;
+        while (surf < 0 && y < Constants.gridH) {
+          if (w.at(x, y) != Material.water) {
+            y++;
+            continue;
           }
+          var bottom = y;
+          while (bottom + 1 < Constants.gridH &&
+              w.at(x, bottom + 1) == Material.water) {
+            bottom++;
+          }
+          final below = bottom + 1 < Constants.gridH
+              ? w.at(x, bottom + 1)
+              : Material.ground;
+          if (below == Material.water ||
+              Materials.blocksWaterByIndex[below.index]) {
+            surf = y;
+          }
+          y = bottom + 1;
         }
       }
       if (surf < 0) {
