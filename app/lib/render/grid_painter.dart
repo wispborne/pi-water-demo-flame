@@ -73,19 +73,11 @@ class GridPainter {
   ) {
     final world = state.world;
     final water = state.sim.water;
+    final (sx, sy) = Sun.position(state.sim.sun.timeSec);
 
-    // Background + day sky (the sky is part of the traced field itself in
-    // traced mode, so it is not drawn there).
     c.drawRect(Offset.zero & size, Paint()..color = _bg);
     if (!traced) {
-      c.drawRect(
-        Offset.zero & size,
-        Paint()
-          ..shader = Gradient.linear(Offset.zero, Offset(0, size.height), [
-            const Color(0xFF8FBFE8),
-            const Color(0xFFD8EDFB),
-          ]),
-      );
+      _drawSky(c, size, sx, sy);
     }
 
     c.save();
@@ -94,29 +86,69 @@ class GridPainter {
 
     final (x0, y0, x1, y1) = cam.visible(size.width, size.height);
 
+    if (!traced && sx < Constants.gridW) {
+      _drawSunGlow(c, sx, sy);
+    }
+
     if (traced && fieldImage != null) {
       c.drawImage(
         fieldImage,
         Offset.zero,
         Paint()..filterQuality = FilterQuality.none,
       );
-    } else if (!traced) {
-      _drawCells(c, world, water, x0, y0, x1, y1);
+    } else {
+      // Plain mode — and traced mode for the first frames after a world
+      // rebuild, before the blitted field image is ready.
+      _drawCells(c, world, water, x0, y0, x1, y1, cam.cellPx);
     }
-    // Traced with the image not ready yet: the field's settled values are
-    // not drawn (the first 1-2 frames after a world rebuild).
 
     _drawLamps(c, world);
     _drawSun(c, state.sim.sun, small: traced);
-    _drawSurface(c, world, water, state.sim.sun.timeSec, state.glow);
+    _drawSurface(c, world, water, state.sim.sun.timeSec, state.glow,
+        cam.cellPx);
     _drawHover(c, hover, cam.cellPx);
 
     c.restore();
   }
 
+  /// The day sky: a vertical gradient whose warmth follows the sun's
+  /// altitude — peach at the horizon (rise/set), bright blue at noon.
+  static void _drawSky(Canvas c, Size size, double sx, double sy) {
+    final altitude =
+        (1.0 - (sy - Constants.sunTopY) / Constants.sunArcDepth).clamp(0.0, 1.0);
+    c.drawRect(
+      Offset.zero & size,
+      Paint()
+        ..shader = Gradient.linear(Offset.zero, Offset(0, size.height), [
+          Color.lerp(const Color(0xFF6E7CA6), const Color(0xFF5B9BD5),
+              altitude)!,
+          Color.lerp(
+              const Color(0xFFF2CDA4), const Color(0xFFD8EDFB), altitude)!,
+        ]),
+    );
+  }
+
+  /// A soft radial glow around the sun, strongest and warmest at low
+  /// altitude (drawn behind the cells, so the tower silhouettes against it).
+  static void _drawSunGlow(Canvas c, double sx, double sy) {
+    final altitude =
+        (1.0 - (sy - Constants.sunTopY) / Constants.sunArcDepth).clamp(0.0, 1.0);
+    const r = 46.0;
+    final alpha = (0x3D + (0x66 - 0x3D) * (1.0 - altitude)).round();
+    c.drawRect(
+      Rect.fromLTWH(sx + 0.5 - r, sy + 0.5 - r, r * 2, r * 2),
+      Paint()
+        ..shader = Gradient.radial(Offset(sx + 0.5, sy + 0.5), r, [
+          Color.fromARGB(alpha, 255, 214, 130),
+          Color.fromARGB(0, 255, 214, 130),
+        ]),
+    );
+  }
+
   /// Plain-mode cells: batched per-material paths, per-cell water depth
-  /// tint, per-cell shade for granular materials, damaged-structure
-  /// darkening, and the spurt overlay.
+  /// tint, per-cell shade for granular materials, per-cell detail for
+  /// furniture when zoomed in, structure grid lines and damage cracks when
+  /// zoomed in, damaged-structure darkening, and the spurt overlay.
   static void _drawCells(
     Canvas c,
     World w,
@@ -125,9 +157,11 @@ class GridPainter {
     int y0,
     int x1,
     int y1,
+    double cellPx,
   ) {
     final paint = Paint();
     final paths = <Material, Path>{};
+    final detail = cellPx >= 4;
     const W = Constants.gridW;
 
     for (var y = y0; y < y1; y++) {
@@ -149,7 +183,13 @@ class GridPainter {
             paint.color = _debrisShades[(x * 7 + y * 13) % 3];
             c.drawRect(rect, paint);
           default:
-            paths.putIfAbsent(m, () => Path()).addRect(rect);
+            if (detail && Materials.furnitureByIndex[m.index]) {
+              paint.color = _mat[m]!;
+              c.drawRect(rect, paint);
+              _drawFurnitureDetail(c, w, m, x, y, paint);
+            } else {
+              paths.putIfAbsent(m, () => Path()).addRect(rect);
+            }
         }
       }
     }
@@ -159,7 +199,25 @@ class GridPainter {
       c.drawPath(p, paint);
     });
 
-    // Damaged structure: a darkening overlay scaled by the missing hp.
+    if (cellPx >= 6) {
+      final p = Path();
+      for (var y = y0; y < y1; y++) {
+        for (var x = x0; x < x1; x++) {
+          final m = w.at(x, y);
+          if (!Materials.structureByIndex[m.index]) continue;
+          p.addRect(Rect.fromLTWH(x.toDouble(), y.toDouble(), 1, 1));
+        }
+      }
+      paint
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0 / cellPx
+        ..color = const Color(0x26000000);
+      c.drawPath(p, paint);
+    }
+
+    // Damaged structure: a darkening overlay scaled by the missing hp, plus
+    // crack strokes when zoomed in (first crack below 70% hp, a second
+    // below 35%).
     for (var i = 0; i < w.cells.length; i++) {
       final m = w.cells[i];
       if (!Materials.structureByIndex[m.index]) continue;
@@ -176,6 +234,23 @@ class GridPainter {
         0,
       );
       c.drawRect(Rect.fromLTWH(x.toDouble(), y.toDouble(), 1, 1), paint);
+      final frac = hp / maxHp;
+      if (cellPx >= 5 && frac < 0.7) {
+        paint
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 0.8 / cellPx
+          ..strokeCap = StrokeCap.round
+          ..color = const Color(0x80000000);
+        final p = Path()
+          ..moveTo(x + 0.15, y + 0.25)
+          ..lineTo(x + 0.55, y + 0.62);
+        if (frac < 0.35) {
+          p
+            ..moveTo(x + 0.78, y + 0.12)
+            ..lineTo(x + 0.42, y + 0.85);
+        }
+        c.drawPath(p, paint);
+      }
     }
 
     // Spurt overlay (the held jet columns; out of the grid).
@@ -190,6 +265,73 @@ class GridPainter {
     }
   }
 
+  /// The plain-view colour of a material (the HUD's hover swatch).
+  static Color materialColor(Material m) =>
+      _mat[m] ?? const Color(0xFF888888);
+
+  /// Sub-rect detail that makes a furniture cell read as its item when
+  /// zoomed in: a chair back, a plant pot, a TV screen, a fridge door seam,
+  /// a tabletop, a bed pillow, a tub rim, sofa arms. Multi-cell footprints
+  /// check their neighbours so a sofa's arms land only on its end cells and
+  /// the pillow only at the bed's head.
+  static void _drawFurnitureDetail(
+    Canvas c,
+    World w,
+    Material m,
+    int x,
+    int y,
+    Paint paint,
+  ) {
+    const W = Constants.gridW;
+    final left = x > 0 ? w.at(x - 1, y) : Material.air;
+    final right = x + 1 < W ? w.at(x + 1, y) : Material.air;
+    switch (m) {
+      case Material.chair:
+        paint.color = const Color(0xFF7A3A20);
+        c.drawRect(Rect.fromLTWH(x.toDouble(), y.toDouble(), 0.38, 1), paint);
+      case Material.plant:
+        paint.color = const Color(0xFF8A5A33);
+        c.drawRect(Rect.fromLTWH(x.toDouble(), y + 0.62, 1, 0.38), paint);
+        paint.color = const Color(0xFF2F6E30);
+        c.drawRect(Rect.fromLTWH(x + 0.2, y + 0.3, 0.6, 0.32), paint);
+      case Material.tv:
+        paint.color = const Color(0xFF2E4A5E);
+        c.drawRect(Rect.fromLTWH(x + 0.16, y + 0.2, 0.68, 0.6), paint);
+      case Material.fridge:
+        paint.color = const Color(0xFFDDE0E5);
+        c.drawRect(Rect.fromLTWH(x.toDouble(), y.toDouble(), 1, 0.36), paint);
+        paint.color = const Color(0xFF9AA0A8);
+        c.drawRect(Rect.fromLTWH(x.toDouble(), y + 0.36, 1, 0.05), paint);
+      case Material.desk:
+        paint.color = const Color(0xFFA97B4B);
+        c.drawRect(Rect.fromLTWH(x.toDouble(), y.toDouble(), 1, 0.3), paint);
+      case Material.table:
+        paint.color = const Color(0xFFBC8550);
+        c.drawRect(Rect.fromLTWH(x.toDouble(), y.toDouble(), 1, 0.34), paint);
+      case Material.counter:
+        paint.color = const Color(0xFFEDE4CD);
+        c.drawRect(Rect.fromLTWH(x.toDouble(), y.toDouble(), 1, 0.3), paint);
+      case Material.bed:
+        if (left != Material.bed) {
+          paint.color = const Color(0xFFE8ECF2);
+          c.drawRect(Rect.fromLTWH(x + 0.08, y + 0.26, 0.3, 0.48), paint);
+        }
+      case Material.tub:
+        paint.color = const Color(0xFFD3D7E0);
+        c.drawRect(Rect.fromLTWH(x + 0.14, y + 0.14, 0.72, 0.72), paint);
+      case Material.sofa:
+        paint.color = const Color(0xFF4A5B4A);
+        if (left != Material.sofa) {
+          c.drawRect(Rect.fromLTWH(x.toDouble(), y.toDouble(), 0.24, 1), paint);
+        }
+        if (right != Material.sofa) {
+          c.drawRect(Rect.fromLTWH(x + 0.76, y.toDouble(), 0.24, 1), paint);
+        }
+      default:
+        break;
+    }
+  }
+
   /// The wavy water-surface line (SPEC 7) and the decorative glow band
   /// (SPEC 9). The wave is the core's [Waves.surface], so the drawn line
   /// moves with the traced glint and caustic.
@@ -199,8 +341,11 @@ class GridPainter {
     Water water,
     double t,
     bool glow,
+    double cellPx,
   ) {
     final paint = Paint();
+    final line = Path();
+    var started = false;
     const twoPi = 6.283185307179586;
 
     for (var x = 0; x < Constants.gridW; x++) {
@@ -225,8 +370,12 @@ class GridPainter {
       final off = Waves.surface(x.toDouble(), t) * 0.35;
       final wy = surf - 0.12 + off;
 
-      paint.color = const Color(0xAAE8FFFF);
-      c.drawRect(Rect.fromLTWH(x.toDouble(), wy, 1, 0.10), paint);
+      if (started) {
+        line.lineTo(x + 0.5, wy + 0.05);
+      } else {
+        line.moveTo(x + 0.5, wy + 0.05);
+        started = true;
+      }
 
       if (glow) {
         final a = 0.10 +
@@ -235,6 +384,16 @@ class GridPainter {
         paint.color = Color.fromARGB(a.round().clamp(0, 90), 255, 255, 230);
         c.drawRect(Rect.fromLTWH(x.toDouble(), wy - 0.75, 1, 0.75), paint);
       }
+    }
+
+    if (started) {
+      paint
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2 / cellPx
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..color = const Color(0xB8E8FFFF);
+      c.drawPath(line, paint);
     }
   }
 

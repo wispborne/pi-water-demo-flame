@@ -1,9 +1,10 @@
- import 'dart:math' as math;
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flame/game.dart';
 import 'package:image/image.dart' as img;
 import 'package:water_tower/core/constants.dart';
+import 'package:water_tower/core/tools.dart';
 import 'package:water_tower/trace/field.dart';
 import 'package:water_tower_app/camera.dart';
 import 'package:water_tower_app/render/grid_painter.dart';
@@ -27,6 +28,10 @@ class WaterGame extends FlameGame {
   int fps = 0;
   int _frames = 0;
   double _fpsClock = 0;
+
+  static const double _burstLife = 0.5;
+  final List<_Burst> _bursts = [];
+  double _flash = 0;
 
   (double, double)? _lastMouse;
   bool _leftDown = false;
@@ -76,6 +81,11 @@ class WaterGame extends FlameGame {
       _frames = 0;
       _fpsClock = 0;
     }
+    for (var i = _bursts.length - 1; i >= 0; i--) {
+      _bursts[i].age += dt;
+      if (_bursts[i].age >= _burstLife) _bursts.removeAt(i);
+    }
+    _flash = (_flash - dt / 0.25).clamp(0.0, 1.0);
   }
 
   @override
@@ -90,6 +100,40 @@ class WaterGame extends FlameGame {
       tracedActive,
       hover,
     );
+    _drawBursts(canvas, ui.Size(size.x, size.y));
+  }
+
+  /// SPEC 8: the bomb's orange spark burst and screen flash (purely visual).
+  void _drawBursts(ui.Canvas canvas, ui.Size size) {
+    if (_bursts.isEmpty && _flash <= 0) return;
+    canvas.save();
+    canvas.translate(cam.offX, cam.offY);
+    canvas.scale(cam.cellPx);
+    final paint = ui.Paint();
+    for (final b in _bursts) {
+      final t = (b.age / _burstLife).clamp(0.0, 1.0);
+      paint
+        ..style = ui.PaintingStyle.stroke
+        ..strokeWidth = (2.5 * (1 - t) + 0.5) / cam.cellPx
+        ..color = ui.Color.fromARGB((190 * (1 - t)).round().clamp(0, 255),
+            255, 140, 40);
+      canvas.drawCircle(ui.Offset(b.x, b.y), 1.2 + 5.5 * t, paint);
+      if (t < 0.35) {
+        paint
+          ..style = ui.PaintingStyle.fill
+          ..color = ui.Color.fromARGB(
+              ((1 - t / 0.35) * 230).round().clamp(0, 255), 255, 214, 130);
+        canvas.drawCircle(ui.Offset(b.x, b.y), 0.8 * (1 - t / 0.35) + 0.2, paint);
+      }
+    }
+    canvas.restore();
+    if (_flash > 0) {
+      canvas.drawRect(
+        ui.Offset.zero & size,
+        ui.Paint()
+          ..color = ui.Color.fromARGB((55 * _flash).round(), 255, 180, 90),
+      );
+    }
   }
 
   // ---- Raw pointer routing (from the Listener wrapper) ----
@@ -173,9 +217,22 @@ class WaterGame extends FlameGame {
   void _applyTool(double x, double y) {
     final (cx, cy) = cam.screenToCell(x, y);
     if (cx >= 0 && cy >= 0 && cx < Constants.gridW && cy < Constants.gridH) {
-      state.sim.tools.apply(state.world, cx, cy);
+      final changed = state.sim.tools.apply(state.world, cx, cy);
+      if (state.tool == Tool.bomb && changed > 0) {
+        _bursts.add(_Burst(cx + 0.5, cy + 0.5));
+        _flash = 1.0;
+      }
     }
   }
+}
+
+/// One bomb blast's visual: a world-space point that lives [_burstLife]
+/// seconds (purely cosmetic, outside the sim state).
+class _Burst {
+  _Burst(this.x, this.y);
+  final double x;
+  final double y;
+  double age = 0;
 }
 
 /// Blits the light field (220x240 RGBA) to a [ui.Image] for the traced

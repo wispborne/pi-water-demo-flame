@@ -161,7 +161,14 @@ hover readout's SPEC 10 strength bar. Verified
 in the running app on Windows: `cd app && flutter run -d windows`.
 macOS desktop support was added on 2026-09-23 (`app/macos/` via
 `flutter create --platforms=macos`, org `com.water_tower`); the app builds
- and runs there with the same 15/15 `flutter test` pass.
+ and runs there with the same 15/15 `flutter test` pass. On 2026-09-25 the
+ plain view gained a sun-altitude-tinted sky gradient with a radial sun glow,
+ structural grid lines and damage cracks that appear above a zoom threshold,
+ furniture detail sub-rectangles on larger cells, a crisp stroked
+ water-surface line, and a bomb burst with a screen flash (SPEC 8); the
+ traced view now shows plain cells as a placeholder before the first
+ light-field blit, and the HUD buttons are filled with the hover readout
+ showing a material swatch.
 
 **Fix (2026-09-24).** The traced view ran at ~2 fps on the default
 30-floor world: the per-frame world diff invalidated the lamps' angular

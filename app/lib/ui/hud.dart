@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:water_tower/core/materials.dart' as core;
 import 'package:water_tower/core/tools.dart';
 import 'package:water_tower_app/game/water_game.dart';
+import 'package:water_tower_app/render/grid_painter.dart';
 import 'package:water_tower_app/sim_state.dart';
 
 /// The HUD (SPEC 10): the counters, the hover readout, the controls, and
@@ -27,7 +28,7 @@ class HudOverlay extends StatefulWidget {
 }
 
 class _HudOverlayState extends State<HudOverlay> {
-  static const double _panelW = 332;
+  static const double _panelW = 334;
   static const double _cellW = 154;
 
   late final TextEditingController _seedCtrl;
@@ -89,6 +90,7 @@ class _HudOverlayState extends State<HudOverlay> {
       decoration: BoxDecoration(
         color: const Color(0xE6101828),
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0x33FFFFFF)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -238,10 +240,21 @@ class _HudOverlayState extends State<HudOverlay> {
       decoration: BoxDecoration(
         color: const Color(0xE6101828),
         borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: const Color(0x33FFFFFF)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+              color: GridPainter.materialColor(m),
+              borderRadius: BorderRadius.circular(3),
+              border: Border.all(color: Colors.white24),
+            ),
+          ),
+          const SizedBox(width: 6),
           Text(
             m.name,
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
@@ -326,9 +339,20 @@ class _HudOverlayState extends State<HudOverlay> {
           style: TextButton.styleFrom(
             padding: EdgeInsets.zero,
             minimumSize: Size.zero,
+            backgroundColor: active
+                ? const Color(0x554FD8E8)
+                : const Color(0x26FFFFFF),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(5),
+              side: BorderSide(
+                color: active
+                    ? const Color(0x884FD8E8)
+                    : const Color(0x29FFFFFF),
+              ),
+            ),
             textStyle: TextStyle(
               fontSize: 11,
-              color: active ? const Color(0xFF4FD8E8) : null,
+              color: active ? const Color(0xFF7FE8F4) : const Color(0xFFDDE5EE),
             ),
           ),
           child: Text(label),
