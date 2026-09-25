@@ -170,6 +170,18 @@ macOS desktop support was added on 2026-09-23 (`app/macos/` via
  light-field blit, and the HUD buttons are filled with the hover readout
  showing a material swatch.
 
+**Fix (2026-09-25).** Rain read as long bright vertical lines: the
+water-surface line took a point at the top of every water column — a
+falling rain drop included — and connected that point to the next water
+column across empty space, so each falling drop drew a near-vertical line
+down to the ground pool (the bright dot at the top of each line was the
+drop's own point). Only at-rest water gets a surface now: a falling
+column's top cell has open air under it, so it drops out of the line and
+the glow band, and the path restarts at every non-contiguous run.
+`app/test/_rainrender.dart` renders the frame headless to
+`out/rain_before.png` / `out/rain_after.png`; the lines are gone and the
+pool's wavy surface line is unchanged.
+
 **Fix (2026-09-24).** The traced view ran at ~2 fps on the default
 30-floor world: the per-frame world diff invalidated the lamps' angular
 shadow sweeps on *any* cell change, and the pool's water cells change every

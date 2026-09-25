@@ -334,7 +334,11 @@ class GridPainter {
 
   /// The wavy water-surface line (SPEC 7) and the decorative glow band
   /// (SPEC 9). The wave is the core's [Waves.surface], so the drawn line
-  /// moves with the traced glint and caustic.
+  /// moves with the traced glint and caustic. Only at-rest water gets a
+  /// surface: a falling column (rain, a pour, a pour-off sheet) has open
+  /// air under its top cell, and connecting across empty columns would
+  /// stretch a line through the sky, so each contiguous run of at-rest
+  /// columns is its own subpath.
   static void _drawSurface(
     Canvas c,
     World w,
@@ -345,7 +349,8 @@ class GridPainter {
   ) {
     final paint = Paint();
     final line = Path();
-    var started = false;
+    var prevAtRest = false;
+    var anyPoint = false;
     const twoPi = 6.283185307179586;
 
     for (var x = 0; x < Constants.gridW; x++) {
@@ -359,23 +364,30 @@ class GridPainter {
           if (w.at(x, y) == Material.water) {
             final above = y > 0 ? w.at(x, y - 1) : Material.air;
             if (above != Material.water) {
-              surf = y;
-              break;
+              final below = y + 1 < Constants.gridH
+                  ? w.at(x, y + 1)
+                  : Material.ground;
+              if (below != Material.air) surf = y; // at rest, not falling
             }
+            break;
           }
         }
       }
-      if (surf < 0) continue;
+      if (surf < 0) {
+        prevAtRest = false;
+        continue;
+      }
 
       final off = Waves.surface(x.toDouble(), t) * 0.35;
       final wy = surf - 0.12 + off;
 
-      if (started) {
+      if (prevAtRest) {
         line.lineTo(x + 0.5, wy + 0.05);
       } else {
         line.moveTo(x + 0.5, wy + 0.05);
-        started = true;
       }
+      prevAtRest = true;
+      anyPoint = true;
 
       if (glow) {
         final a = 0.10 +
@@ -386,7 +398,7 @@ class GridPainter {
       }
     }
 
-    if (started) {
+    if (anyPoint) {
       paint
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.2 / cellPx
