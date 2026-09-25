@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import '../core/constants.dart';
+import '../core/materials.dart';
 import '../core/sun.dart';
 import '../core/water.dart';
 import '../core/world.dart';
@@ -117,7 +118,6 @@ class Tracer {
     final firstFrame = _prevMat == null;
     (int, int)? lampFocus;
     final changedCols = <int>{};
-    var matsChanged = false;
     if (firstFrame) {
       // First frame (or after [field.clear]): the whole field is dirty.
       field.clear();
@@ -126,11 +126,18 @@ class Tracer {
       _lampSweepsValid = false;
     } else {
       final prevMat = _prevMat!;
+      var occludersChanged = false;
       for (var i = 0; i < curMat.length; i++) {
         if (curMat[i] != prevMat[i]) {
           _dirtyBox(i, _margin);
           changedCols.add(i % _w);
-          matsChanged = true;
+          // Only light-blocking cells feed the occluder list; a water/air
+          // cell moving changes no sweep, so the lamp sweeps stay valid
+          // while the pool surface sloshes.
+          if (Materials.blocksLightByIndex[curMat[i]] ||
+              Materials.blocksLightByIndex[prevMat[i]]) {
+            occludersChanged = true;
+          }
         }
       }
       final prevSpurt = _prevSpurt!;
@@ -162,7 +169,7 @@ class Tracer {
       for (final c in changedCols) {
         _spans.rebuildColumn(c, w, water);
       }
-      if (matsChanged) {
+      if (occludersChanged) {
         _blockers = null;
         _lampSweepsValid = false;
       }

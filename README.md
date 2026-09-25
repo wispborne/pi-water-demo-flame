@@ -162,6 +162,17 @@ macOS desktop support was added on 2026-09-23 (`app/macos/` via
 `flutter create --platforms=macos`, org `com.water_tower`); the app builds
  and runs there with the same 15/15 `flutter test` pass.
 
+**Fix (2026-09-24).** The traced view ran at ~2 fps on the default
+30-floor world: the per-frame world diff invalidated the lamps' angular
+shadow sweeps on *any* cell change, and the pool's water cells change every
+frame, so all 120 lamp sweeps (each sorting the angle events of ~7,600
+occluder cells) were rebuilt every frame. A CPU profile of the running app
+put ~89 % of the frame in those rebuilds, ~47 % of it the sort. Only
+light-blocking cells feed the occluder list, so only a light-blocking cell
+change now invalidates the sweeps. A steady frame is back to ~24 ms
+headless (JIT) and the app holds 30 fps in the window;
+`tool/_fpsprobe.dart` reproduces the scene and times it.
+
 **Fix (2026-09-24).** The traced tower read as a blown-out blob: the lamps
 were ~5× too strong, the falloff was shallow enough that a lamp lit the
 whole tower, and solid cells rendered the light arriving at them with no
