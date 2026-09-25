@@ -110,6 +110,33 @@ class Materials {
     for (final m in Material.values)
       structure.contains(m) || m == Material.ground || m == Material.wood
   ];
+
+  /// Per-channel reflectance for the light-blocking materials: the traced
+  /// view multiplies the light arriving at a solid cell by this, so walls
+  /// read darker than the lit air around them. Values follow the plain
+  /// view's palette (non-blocking materials are white: unaffected).
+  static final List<(double, double, double)> albedoByIndex = [
+    for (final m in Material.values) _albedo(m),
+  ];
+
+  static (double, double, double) _albedo(Material m) {
+    switch (m) {
+      case Material.ground:
+        return (0.23, 0.20, 0.16);
+      case Material.concrete:
+        return (0.66, 0.66, 0.66);
+      case Material.rebar:
+        return (0.71, 0.67, 0.61);
+      case Material.steel:
+        return (0.56, 0.65, 0.70);
+      case Material.titanium:
+        return (0.78, 0.79, 0.81);
+      case Material.wood:
+        return (0.54, 0.42, 0.30);
+      default:
+        return (1.0, 1.0, 1.0);
+    }
+  }
   static final List<int> toleranceByIndex =
       [for (final m in Material.values) props[m]!.tolerance];
   static final List<int> hpByIndex =

@@ -30,8 +30,9 @@ class Transport {
   // Sun colour: warm white, slightly over 1 so a clear-sky cell reads bright
   // (the GUI tone-maps with Reinhard).
   static const double sunR = 1.40, sunG = 1.33, sunB = 1.19;
-  // Lamp colour: warm tungsten.
-  static const double lampR = 1.20, lampG = 0.74, lampB = 0.36;
+  // Lamp colour: warm tungsten, dimmed so a lamp-lit room reads ~40-70% of
+  // the sunlit sky (SPEC 7: a lamp lights its room and only its room).
+  static const double lampR = 0.24, lampG = 0.15, lampB = 0.072;
 
   /// A lamp's light is sampled for cells within this many cells of it.
   static const int lampRadius2 = 48 * 48;
@@ -163,10 +164,22 @@ class Transport {
       final tClip = dLen > 1.0 ? 1 - 0.5 / dLen : 1.0;
       final (tr, tg, tb) =
           spans.transmittance(Ray(px, py, ddx, ddy), tMax: tClip);
-      final fall = 1 / (1 + d2 / 144);
+      // Half intensity at 8 cells, ~2% at the 48-cell radius: a lamp's
+      // light stays mostly in its own room.
+      final fall = 1 / (1 + d2 / 64);
       r += lampR * fall * tr;
       g += lampG * fall * tg;
       b += lampB * fall * tb;
+    }
+
+    // A solid cell reflects only a fraction of the arriving light (its
+    // albedo), so walls and slabs read darker than the lit air around
+    // them; air, water, glass, and furniture pass the light through.
+    if (Materials.blocksLightByIndex[m.index]) {
+      final (ar, ag, ab) = Materials.albedoByIndex[m.index];
+      r *= ar;
+      g *= ag;
+      b *= ab;
     }
 
     return (r, g, b);

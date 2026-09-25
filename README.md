@@ -162,6 +162,18 @@ macOS desktop support was added on 2026-09-23 (`app/macos/` via
 `flutter create --platforms=macos`, org `com.water_tower`); the app builds
  and runs there with the same 15/15 `flutter test` pass.
 
+**Fix (2026-09-24).** The traced tower read as a blown-out blob: the lamps
+were ~5× too strong, the falloff was shallow enough that a lamp lit the
+whole tower, and solid cells rendered the light arriving at them with no
+material reflectance, so walls read as bright as the lit air. Lamps are now
+dimmed and the falloff is steeper (half intensity at 8 cells, not 12), and
+solid cells multiply the arriving light by their material albedo
+(`Materials.albedoByIndex`, following the plain-view palette). A lamp-lit
+room now reads ~67 % of the sky in the default world (measured from a
+screenshot) and walls read darker than the air around them. The standing
+checks' brightness thresholds are re-set to the new magnitudes;
+`tool/_lampdim.dart` prints the settled values.
+
 **Traced-view engine rewrite (2026-09-24).** The tracer no longer marches
 each sun/lamp ray through the grid cell by cell. Per frame it precomputes
 per-column contiguous spans of occluder/water/glass cells and, per light,
