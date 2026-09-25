@@ -6,6 +6,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:water_tower/core/tools.dart';
 import 'package:water_tower_app/camera.dart';
 import 'package:water_tower_app/render/grid_painter.dart';
 import 'package:water_tower_app/sim_state.dart';
@@ -16,6 +17,15 @@ void main() {
     final outName = suffix == null ? 'rain' : 'rain_$suffix';
     final state = SimState('seed-1');
     state.setRain(17);
+    if (Platform.environment['RAIN_DAMAGE'] == '1') {
+      state.tools.tool = Tool.bomb;
+      for (final p in const [(100, 101), (110, 101), (120, 101), (105, 100),
+          (115, 100), (125, 101), (95, 101), (100, 150), (118, 130),
+          (110, 170), (105, 120), (125, 160), (95, 140), (115, 190),
+          (108, 200), (120, 210)]) {
+        state.tools.apply(state.world, p.$1, p.$2);
+      }
+    }
     for (var t = 0; t < 600; t++) {
       state.sim.tick(state.world);
     }

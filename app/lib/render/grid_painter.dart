@@ -336,9 +336,14 @@ class GridPainter {
   /// (SPEC 9). The wave is the core's [Waves.surface], so the drawn line
   /// moves with the traced glint and caustic. Only at-rest water gets a
   /// surface: a falling column (rain, a pour, a pour-off sheet) has open
-  /// air under its top cell, and connecting across empty columns would
-  /// stretch a line through the sky, so each contiguous run of at-rest
-  /// columns is its own subpath.
+  /// air under its top cell, a grain (rubble, debris, furniture, lamp)
+  /// under it sinks or floats out of the water on the next buoyancy
+  /// pass, so only water or a permanent wall under the top cell counts
+  /// as support. A real surface changes level by at most a cell between
+  /// neighbouring columns (water levels out sideways), so a jump bigger
+  /// than that — a flagged mid-sky point next to a pool, a jet spurt
+  /// above its pool, a cliff between two levels — starts a new subpath
+  /// instead of drawing a chord across the gap.
   static void _drawSurface(
     Canvas c,
     World w,
@@ -350,6 +355,7 @@ class GridPainter {
     final paint = Paint();
     final line = Path();
     var prevAtRest = false;
+    var prevWy = -1e9;
     var anyPoint = false;
     const twoPi = 6.283185307179586;
 
@@ -364,10 +370,19 @@ class GridPainter {
           if (w.at(x, y) == Material.water) {
             final above = y > 0 ? w.at(x, y - 1) : Material.air;
             if (above != Material.water) {
+              // At rest: water or a permanent wall under the top cell.
+              // Open air = falling (rain, pour, pour-off sheet). A
+              // mobile grain (rubble, debris, furniture, lamp) is not
+              // support: it sinks or floats out of the water on the
+              // next buoyancy pass, and the falling drop above it would
+              // otherwise draw a surface line to the ground.
               final below = y + 1 < Constants.gridH
                   ? w.at(x, y + 1)
                   : Material.ground;
-              if (below != Material.air) surf = y; // at rest, not falling
+              if (below == Material.water ||
+                  Materials.blocksWaterByIndex[below.index]) {
+                surf = y;
+              }
             }
             break;
           }
@@ -381,12 +396,17 @@ class GridPainter {
       final off = Waves.surface(x.toDouble(), t) * 0.35;
       final wy = surf - 0.12 + off;
 
-      if (prevAtRest) {
+      // Connect only across small level changes: a real surface moves at
+      // most a cell or two between neighbours. A bigger jump (a mid-sky
+      // point beside a pool, a spurt above its pool, a cliff) is a gap,
+      // not a slope — start a new subpath instead of a long chord.
+      if (prevAtRest && (wy - prevWy).abs() <= 2.0) {
         line.lineTo(x + 0.5, wy + 0.05);
       } else {
         line.moveTo(x + 0.5, wy + 0.05);
       }
       prevAtRest = true;
+      prevWy = wy;
       anyPoint = true;
 
       if (glow) {

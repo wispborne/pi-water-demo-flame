@@ -170,6 +170,19 @@ macOS desktop support was added on 2026-09-23 (`app/macos/` via
  light-field blit, and the HUD buttons are filled with the hover readout
  showing a material swatch.
 
+**Fix (2026-09-25).** The rain lines came back on damaged towers: the
+surface line connected a point in one column to the point in the
+neighbouring column no matter the vertical distance, so any flagged
+mid-sky point (a drop passing falling rubble, a jet spurt above its
+pool) drew a near-vertical line down to the pool surface beside it. A
+column now only counts as at-rest when water or a permanent wall sits
+under its top cell (a mobile grain under a drop is not support), and the
+line starts a new subpath when the level jumps more than two cells
+between neighbouring columns, since a real surface moves at most that
+far. `app/test/_rainrender.dart` renders the damaged-tower frame headless
+to `out/rain_damaged.png`; the drops stay dots and the pool and roof
+surface lines are unchanged.
+
 **Fix (2026-09-25).** Rain read as long bright vertical lines: the
 water-surface line took a point at the top of every water column — a
 falling rain drop included — and connected that point to the next water
