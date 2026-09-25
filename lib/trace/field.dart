@@ -1,24 +1,6 @@
-import 'dart:math' as math;
 import 'dart:typed_data';
 
 import '../core/constants.dart';
-
-/// The deterministic water-surface wave (SPEC 7: "a slow swell plus two
-/// faster short waves"): a value in [-1, 1] at world column [x] and sim
-/// time [tSec]. Pure function of (x, t) — the same function the GUI uses to
-/// draw the wavy surface line, so the traced glint and caustic move with the
-/// drawn surface.
-class Waves {
-  static const double _twoPi = 6.283185307179586;
-
-  static double surface(double x, double tSec) {
-    final t = tSec;
-    final v = 0.50 * math.sin(_twoPi * (x / 24.0 + t / 9.0)) +
-        0.30 * math.sin(_twoPi * (x / 9.0 - t / 3.5 + 0.31)) +
-        0.20 * math.sin(_twoPi * (x / 5.0 + t / 1.7 + 0.73));
-    return v.clamp(-1.0, 1.0);
-  }
-}
 
 /// Per-cell accumulated light (PLAN decision 2: the field is 1:1 with the
 /// grid, 220 x 240). Each cell holds a running mean of its exact

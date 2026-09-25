@@ -4,7 +4,6 @@ import '../core/constants.dart';
 import '../core/materials.dart';
 import '../core/water.dart';
 import '../core/world.dart';
-import 'field.dart';
 import 'ray.dart';
 import 'shadows.dart';
 import 'surface.dart';
@@ -25,7 +24,7 @@ class Transport {
   final List<int> lampX, lampY;
   final World w;
   final Water water;
-  final double sx, sy, tSec;
+  final double sx, sy;
 
   // Sun colour: warm white, slightly over 1 so a clear-sky cell reads bright
   // (the GUI tone-maps with Reinhard).
@@ -65,7 +64,6 @@ class Transport {
     this.water,
     this.sx,
     this.sy,
-    this.tSec,
   );
 
   /// The light arriving at cell (x, y).
@@ -118,11 +116,11 @@ class Transport {
 
     // --- Caustic: sun rays refracted at the surface above this cell ---
     if (!inWater) {
-      final top = Surface.topY(x, tSec, w, water);
+      final top = Surface.topY(x, w, water);
       if (top >= 0 && py > top) {
         for (var sxx = x - _causticSpread; sxx <= x + _causticSpread; sxx++) {
           if (sxx < 0 || sxx >= Constants.gridW) continue;
-          final qy = Surface.surfIn(sxx, sxx + 0.5, tSec, w, water);
+          final qy = Surface.surfIn(sxx, w, water);
           if (qy == null) continue;
           final qx = sxx + 0.5;
           if (!sunSweep.isVisible(qx, qy)) continue;
@@ -132,7 +130,7 @@ class Transport {
           final dLen = math.sqrt(dsx * dsx + dsy * dsy);
           final dxn = dsx / dLen;
           final dyn = dsy / dLen;
-          final (nx, ny) = Surface.normal(qx, tSec);
+          final (nx, ny) = Surface.normal(qx, water);
           final cosI = -(dxn * nx + dyn * ny);
           if (cosI <= 0) continue;
           final refr = Optics.refract(dxn, dyn, nx, ny, Optics.etaWater);
@@ -193,14 +191,12 @@ class Transport {
     return y == 0 || w.at(x, y - 1) == Material.air;
   }
 
-  /// The glint lobe in (0, 1] at surface column [x].
+  /// The glint lobe in (0, 1] at surface column [x]: centred on the sun's
+  /// x, wobbled by the surface slope (the core's per-column displacement,
+  /// zero where the water is at rest).
   double _glintLobe(int x) {
-    final center =
-        (x - sx) + _slope(x.toDouble()) * _glintSlope;
+    final center = (x - sx) + Surface.dSurf(x.toDouble(), water) * _glintSlope;
     final v = 1.0 - center * center / (_glintWidth * _glintWidth);
     return v <= 0 ? 0.0 : v * v;
   }
-
-  double _slope(double x) =>
-      Waves.surface(x + 0.5, tSec) - Waves.surface(x - 0.5, tSec);
 }

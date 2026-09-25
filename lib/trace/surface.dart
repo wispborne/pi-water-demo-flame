@@ -4,20 +4,18 @@ import '../core/constants.dart';
 import '../core/materials.dart';
 import '../core/water.dart';
 import '../core/world.dart';
-import 'field.dart';
 
-/// The water surface as a continuous function of (x, t): the per-column top
-/// row (a step) plus the same wave offset the GUI draws
-/// (surf - 0.12 + Waves.surface(x, t) * 0.35), so traced glint, caustics
-/// and bounces move with the drawn line.
+/// The water surface as a continuous function of x: the per-column top row
+/// (a step) plus the core's per-column surface displacement
+/// ([Water.surfaceOffset]) — the damped motion the water's own impacts,
+/// pours, and flows stir into the surface (flat where the water is at rest)
+/// — so traced glint, caustics, and bounces move with the drawn line.
 class Surface {
-  static const double _twoPi = 6.283185307179586;
   static const double _offset = -0.12;
-  static const double _amp = 0.35;
 
-  /// The drawn surface's top row at column [col] and sim time [tSec]; -1
-  /// when the column holds no water.
-  static double topY(int col, double tSec, World w, Water water) {
+  /// The drawn surface's top row at column [col]; -1 when the column holds
+  /// no water.
+  static double topY(int col, World w, Water water) {
     final s = water.spurts[col];
     if (s.active) return s.top.toDouble();
     for (var y = 0; y < Constants.gridH; y++) {
@@ -29,37 +27,40 @@ class Surface {
     return -1;
   }
 
-  /// The continuous surface y at (x, tSec) for the column under [x]; null
-  /// when that column holds no water.
-  static double? surfY(double x, double tSec, World w, Water water) {
+  /// The continuous surface y at x for the column under [x]; null when that
+  /// column holds no water.
+  static double? surfY(double x, World w, Water water) {
     final col = x.floor();
     if (col < 0 || col >= Constants.gridW) return null;
-    final top = topY(col, tSec, w, water);
+    final top = topY(col, w, water);
     if (top < 0) return null;
-    return top + _offset + _amp * Waves.surface(x, tSec);
+    return top + _offset + water.surfaceOffset(col);
   }
 
   /// The surface y restricted to column [col] (its own top step plus the
-  /// wave at x).
-  static double? surfIn(int col, double x, double tSec, World w, Water water) {
-    final top = topY(col, tSec, w, water);
+  /// column's surface displacement).
+  static double? surfIn(int col, World w, Water water) {
+    final top = topY(col, w, water);
     if (top < 0) return null;
-    return top + _offset + _amp * Waves.surface(x, tSec);
+    return top + _offset + water.surfaceOffset(col);
   }
 
-  /// d/dx of the wave part of the surface at (x, tSec) (analytic).
-  static double dSurf(double x, double tSec) {
-    final a = _twoPi;
-    return _amp *
-        (0.50 * a / 24 * math.cos(a * (x / 24 + tSec / 9)) +
-            0.30 * a / 9 * math.cos(a * (x / 9 - tSec / 3.5 + 0.31)) +
-            0.20 * a / 5 * math.cos(a * (x / 5 + tSec / 1.7 + 0.73)));
+  /// d/dx of the surface at [x]: the central difference of the core's
+  /// per-column displacement (the surface is flat where the water is at
+  /// rest, so the slope is zero there).
+  static double dSurf(double x, Water water) {
+    final col = x.floor();
+    final lo =
+        col > 0 ? water.surfaceOffset(col - 1) : water.surfaceOffset(col);
+    final hi = col + 1 < Constants.gridW
+        ? water.surfaceOffset(col + 1)
+        : water.surfaceOffset(col);
+    return (hi - lo) / 2.0;
   }
 
-  /// The upward surface normal (out of the water) at (x, tSec), unit
-  /// length.
-  static (double, double) normal(double x, double tSec) {
-    final s = dSurf(x, tSec);
+  /// The upward surface normal (out of the water) at [x], unit length.
+  static (double, double) normal(double x, Water water) {
+    final s = dSurf(x, water);
     final len = math.sqrt(s * s + 1);
     return (s / len, -1 / len);
   }
@@ -75,13 +76,12 @@ class Surface {
     double dy, {
     double tMax = double.infinity,
     required bool fromAbove,
-    required double tSec,
     required World w,
     required Water water,
   }) {
     if (dx == 0) {
       if (dy == 0) return null;
-      final s = surfY(ox, tSec, w, water);
+      final s = surfY(ox, w, water);
       if (s == null) return null;
       final t = (s - oy) / dy;
       if (t <= 0 || t > tMax) return null;
@@ -97,7 +97,7 @@ class Surface {
       if (col < 0 || col >= Constants.gridW) return null;
       var t1 = t0 + 1 / dx;
       if (t1 > tMax) t1 = tMax;
-      final s = surfIn(col, ox + dx * (t0 + t1) / 2, tSec, w, water);
+      final s = surfIn(col, w, water);
       if (s != null) {
         final f0 = oy + dy * t0 - s;
         final f1 = oy + dy * t1 - s;
@@ -107,7 +107,7 @@ class Surface {
           var fLo = f0;
           for (var i = 0; i < 30; i++) {
             final mid = (lo + hi) / 2;
-            final sm = surfIn(col, ox + dx * mid, tSec, w, water)!;
+            final sm = surfIn(col, w, water)!;
             final fm = oy + dy * mid - sm;
             if (fLo * fm <= 0) {
               hi = mid;

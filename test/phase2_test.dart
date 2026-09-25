@@ -216,6 +216,78 @@ void main() {
     expect(eng.isSpurtCell(20, s.top), isTrue);
   });
 
+  test('the surface is flat at rest, stirs on a pour, and decays to flat', () {
+    // A level pool at rest stirs nothing: the motion must come from the
+    // water's own movement, not from the update itself.
+    final w = bare();
+    ground(w, 238);
+    w.fillRect(95, 230, 95, 237, Material.concrete);
+    w.fillRect(136, 230, 136, 237, Material.concrete);
+    for (var x = 96; x < 136; x++) {
+      for (var y = 234; y < 238; y++) {
+        w.set(x, y, Material.water);
+      }
+    }
+    final eng = Water();
+    for (var t = 0; t < 60; t++) eng.tick(w);
+    for (var x = 96; x < 136; x++) {
+      expect(
+        eng.surfaceOffset(x),
+        0,
+        reason: 'resting pool surface not flat at column $x',
+      );
+    }
+
+    // A poured column stirs the surface while it settles into the pool...
+    final w2 = bare();
+    ground(w2, 238);
+    w2.fillRect(95, 230, 95, 237, Material.concrete);
+    w2.fillRect(136, 230, 136, 237, Material.concrete);
+    for (var x = 96; x < 136; x++) {
+      for (var y = 234; y < 238; y++) {
+        w2.set(x, y, Material.water);
+      }
+    }
+    final eng2 = Water();
+    for (var t = 0; t < 60; t++) {
+      eng2.tick(w2);
+    }
+    for (var y = 200; y < 234; y++) {
+      w2.set(115, y, Material.water);
+    }
+    final v0 = eng2.countWater(w2);
+    var maxOff = 0.0;
+    for (var t = 0; t < 60; t++) {
+      eng2.tick(w2);
+      for (var x = 0; x < Constants.gridW; x++) {
+        final o = eng2.surfaceOffset(x).abs();
+        if (o > maxOff) maxOff = o;
+      }
+    }
+    expect(
+      maxOff,
+      greaterThan(0.25),
+      reason: 'the pour did not stir the surface',
+    );
+
+    // ...and the ripples decay back to a flat line.
+    for (var t = 0; t < 400; t++) {
+      eng2.tick(w2);
+    }
+    for (var x = 0; x < Constants.gridW; x++) {
+      expect(
+        eng2.surfaceOffset(x).abs(),
+        lessThan(0.125),
+        reason: 'surface did not settle flat at column $x',
+      );
+    }
+    expect(
+      eng2.countWater(w2),
+      v0,
+      reason: 'volume changed through the surface motion',
+    );
+  });
+
   test('water volume is conserved (grid + spurt overlay) over a long run', () {
     final w = bare();
     ground(w, 238);

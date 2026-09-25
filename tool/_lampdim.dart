@@ -42,7 +42,7 @@ void main() {
   final sunSweep = ShadowSweep()..build(sx, sy, blockers);
   final lampSweep = ShadowSweep()..build(188.5, 228.5, blockers);
   final transport = Transport(
-    spans, sunSweep, [lampSweep], [188], [228], w, sim.water, sx, sy, 841.0);
+      spans, sunSweep, [lampSweep], [188], [228], w, sim.water, sx, sy);
   for (final (x, y) in [
     (190, 228),
     (202, 230),

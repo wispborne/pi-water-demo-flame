@@ -124,8 +124,8 @@ lamp reads warm amber.
   pan with tool, right-drag or space+drag pan, wheel zoom around cursor),
   input routing (mouse buttons → tools, keys 1–8).
 - `lib/render/grid_painter.dart` — one `CustomPainter` per frame (batched
-  fill-rects per material; wavy water-surface line: slow swell + two faster
-  short waves).
+  fill-rects per material; the water-surface line, flat at rest and
+  rippling where water lands).
 - `lib/ui/hud.dart` — Flutter `Stack` overlay: counters (water cells, building
   damage %, destroyed cells, FPS), hover readout (material, strength bar,
   pressure, light swatch), controls (Pause, Speed, Reset, New seed, Glow,

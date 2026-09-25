@@ -33,7 +33,7 @@ good at; the world itself is one canvas, not a component forest.
 - **One `CustomPainter` per frame**, not one component per cell. 30 floors × 10
   bays is at most a few thousand visible cells; 10k Flame components would be a
   perf disaster. The painter iterates the grid and batches fill-rects per
-  material; water surface is a wavy line (slow swell + two faster short waves).
+   material; water surface is a flat line at rest, rippling where water lands.
 - **Fixed grid dimensions are constants**, independent of seed/floors/width
   (SPEC §1).
 - Grid resolution: pick a cell size so the default 30-floor tower fits the
@@ -195,7 +195,7 @@ app/                   # Flutter/Flame package (created when Flutter SDK availab
   lib/main.dart        # app shell, seed arg, HUD overlay (Stack)
   lib/game/water_game.dart # FlameGame: loop, camera, input routing
   lib/ui/hud.dart      # counters, hover readout, controls, sliders
-  lib/render/grid_painter.dart # one CustomPainter per frame; water wavy line
+   lib/render/grid_painter.dart # one CustomPainter per frame; water surface line
 ```
 
 **Key architectural rule**: `core/` and `trace/` are plain Dart with zero

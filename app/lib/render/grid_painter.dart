@@ -6,7 +6,6 @@ import 'package:water_tower/core/materials.dart';
 import 'package:water_tower/core/sun.dart';
 import 'package:water_tower/core/water.dart';
 import 'package:water_tower/core/world.dart';
-import 'package:water_tower/trace/field.dart';
 import 'package:water_tower_app/camera.dart';
 import 'package:water_tower_app/sim_state.dart';
 
@@ -104,8 +103,7 @@ class GridPainter {
 
     _drawLamps(c, world);
     _drawSun(c, state.sim.sun, small: traced);
-    _drawSurface(c, world, water, state.sim.sun.timeSec, state.glow,
-        cam.cellPx);
+    _drawSurface(c, water, state.sim.sun.timeSec, state.glow, cam.cellPx);
     _drawHover(c, hover, cam.cellPx);
 
     c.restore();
@@ -332,21 +330,23 @@ class GridPainter {
     }
   }
 
-  /// The wavy water-surface line (SPEC 7) and the decorative glow band
-  /// (SPEC 9). The wave is the core's [Waves.surface], so the drawn line
-  /// moves with the traced glint and caustic. Only at-rest water gets a
-  /// surface: a water run counts as at rest when its bottom cell has
-  /// water or a permanent wall under it (open air under it = falling
-  /// rain, pour, pour-off sheet; a mobile grain under it sinks or
-  /// floats out on the next buoyancy pass), so a falling drop above the
-  /// pool keeps the pool's own surface point. A real surface changes
-  /// level by at most a cell between neighbouring columns (water levels
-  /// out sideways), so a jump bigger than that — a jet spurt above its
-  /// pool, a cliff between two levels — starts a new subpath instead of
-  /// drawing a chord across the gap.
+  /// The water-surface line (SPEC 7) and the decorative glow band (SPEC 9).
+  /// The line is flat where the water is at rest and moves with the water's
+  /// own motion: the core's per-column surface displacement
+  /// ([Water.surfaceOffset]), stirred by impacts, pours, and flows and
+  /// damped to zero, so a calm pool draws a flat line and the traced glint
+  /// and caustic move with it. Only at-rest water gets a surface: the
+  /// core's per-column at-rest scan ([Water.surfRow]) — a water run counts
+  /// as at rest when its bottom cell has water or a permanent wall under
+  /// it (open air under it = falling rain, pour, pour-off sheet; a mobile
+  /// grain under it sinks or floats out on the next buoyancy pass), so a
+  /// falling drop above the pool keeps the pool's own surface point. A
+  /// real surface changes level by at most a cell between neighbouring
+  /// columns (water levels out sideways), so a jump bigger than that — a
+  /// jet spurt above its pool, a cliff between two levels — starts a new
+  /// subpath instead of drawing a chord across the gap.
   static void _drawSurface(
     Canvas c,
-    World w,
     Water water,
     double t,
     bool glow,
@@ -360,48 +360,13 @@ class GridPainter {
     const twoPi = 6.283185307179586;
 
     for (var x = 0; x < Constants.gridW; x++) {
-      final s = water.spurts[x];
-      int surf;
-      if (s.active) {
-        surf = s.top;
-      } else {
-        // Scan the column's water runs top-down and take the top of the
-        // first at-rest run. A run is at rest when its bottom cell has
-        // water or a permanent wall under it: open air under the bottom
-        // = falling (rain, pour, pour-off sheet), and a mobile grain
-        // (rubble, debris, furniture, lamp) under it sinks or floats out
-        // on the next buoyancy pass. A falling drop above the pool must
-        // not take the column's point, or the pool's surface line gaps
-        // out under every passing drop.
-        surf = -1;
-        var y = 0;
-        while (surf < 0 && y < Constants.gridH) {
-          if (w.at(x, y) != Material.water) {
-            y++;
-            continue;
-          }
-          var bottom = y;
-          while (bottom + 1 < Constants.gridH &&
-              w.at(x, bottom + 1) == Material.water) {
-            bottom++;
-          }
-          final below = bottom + 1 < Constants.gridH
-              ? w.at(x, bottom + 1)
-              : Material.ground;
-          if (below == Material.water ||
-              Materials.blocksWaterByIndex[below.index]) {
-            surf = y;
-          }
-          y = bottom + 1;
-        }
-      }
+      final surf = water.surfRow[x];
       if (surf < 0) {
         prevAtRest = false;
         continue;
       }
 
-      final off = Waves.surface(x.toDouble(), t) * 0.35;
-      final wy = surf - 0.12 + off;
+      final wy = surf - 0.12 + water.surfaceOffset(x);
 
       // Connect only across small level changes: a real surface moves at
       // most a cell or two between neighbours. A bigger jump (a mid-sky

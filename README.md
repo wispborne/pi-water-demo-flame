@@ -35,7 +35,10 @@ is a pure-Dart package — headless-testable on any box; the GUI is the
     (carried sideways), erosion at head > material tolerance, lateral
     momentum, jets (a head ≥ 8 confined body spurts out of an open crack as
     a held spurt column), wash (flowing water scours rubble/debris
-    sideways), volume conserved.
+    sideways), volume conserved; surface motion (a per-column damped
+    elevation that dips where water lands — a pour, a falling column, rain,
+    a jet, a dumped wall — and decays back to a flat line, so a calm pool is
+    exactly flat).
   - `structure.dart` — structural failure: a section severed from the
     foundation (support gap ≥ 3 air cells; gaps ≤ 2 bridge) slumps for
     ~2 sim-seconds, then breaks into rubble (heavy materials) or debris.
@@ -66,12 +69,11 @@ is a pure-Dart package — headless-testable on any box; the GUI is the
 - `tool/phaseN_dump.dart` — per-phase headless artifacts: pure-Dart ASCII
   dumps of the sim into `out/phaseN/` (e.g. `dart run tool/phase4_dump.dart`).
 - `lib/trace/` — the traced view (Phase 5), pure Dart: `field.dart` (the
-  per-cell light field + the deterministic wave surface), `ray.dart`
-  (per-column scene spans, transmittance, occluder queries), `shadows.dart`
-  (the per-light angular shadow sweep), `surface.dart` (the wave surface and
-  refraction), `transport.dart` (one cell's light: sun/lamp next events,
-  shafts, glint, caustic), and `tracer.dart` (dirty-region re-convergence,
-  ray budget).
+  per-cell light field), `ray.dart` (per-column scene spans, transmittance,
+  occluder queries), `shadows.dart` (the per-light angular shadow sweep),
+  `surface.dart` (the surface step + per-column displacement and refraction),
+  `transport.dart` (one cell's light: sun/lamp next events, shafts, glint,
+  caustic), and `tracer.dart` (dirty-region re-convergence, ray budget).
 - `test/phase5_test.dart` — the standing checks: light blocked by a
   one-cell partition, light through furniture, roofed-pool surface static
   across the arc, open-pool glint under the sun, settle + local
@@ -91,12 +93,13 @@ is a pure-Dart package — headless-testable on any box; the GUI is the
     (light field → `ui.Image` via a pure-Dart PNG encode, decoded on a
     codec thread).
   - `render/grid_painter.dart` — one painter per frame: plain mode (sky,
-    cells batched per material, depth tint, wavy surface line, glow band,
-    sun) and traced mode (the blitted field, then bulbs, sun disc, surface
-    line and glow band on top; the scene is lit only by the traced light).
+    cells batched per material, depth tint, the surface line (flat at rest,
+    rippling where water lands), glow band, sun) and traced mode (the
+    blitted field, then bulbs, sun disc, surface line and glow band on top;
+    the scene is lit only by the traced light).
   - `ui/hud.dart` — the 10 Hz overlay: counters, hover readout, controls,
     sliders.
-  - `test/widget_test.dart` — the 15 GUI contract tests.
+  - `test/widget_test.dart` — the 16 GUI contract tests.
 
 ## Run
 
@@ -131,7 +134,7 @@ commit. Decisions are in `PLAN.md`; the design context in `CONTEXT.md`.
 | Phase | Description | Status |
 |---|---|---|
 | 1 | Foundation: deterministic world generation | ✅ done |
-| 2 | Water physics (fall/flow, per-body head, erosion, jets) | ✅ done |
+| 2 | Water physics (fall/flow, per-body head, erosion, jets, surface ripples) | ✅ done |
 | 3 | Structural failure and buoyancy | ✅ done |
 | 4 | Sun, tools, sim driver | ✅ done |
 | 5 | Traced view (progressive light field) | ✅ done |
@@ -169,6 +172,22 @@ macOS desktop support was added on 2026-09-23 (`app/macos/` via
  traced view now shows plain cells as a placeholder before the first
  light-field blit, and the HUD buttons are filled with the hover readout
  showing a material swatch.
+
+**Change (2026-09-25).** The water surface now moves. The old ambient swell
+(a slow sine plus two faster short waves, a fixed function of sim time) is
+gone; the surface is flat exactly where the water is at rest. Instead the
+core carries a per-column damped elevation: water that lands — a pour, a
+falling column, rain, a jet, a wall dumping in — kicks a dip where it
+touches down, weighted by how much water arrived, the ripples spread
+sideways and decay back to a flat line in a couple of seconds. The dip comes
+from vertical arrivals only, so a slow level rise (water spreading sideways)
+does not stir the surface. It is deterministic (integer-only, no clock),
+volume is untouched, and the traced view reads the same per-column
+displacement for glint slope and refraction. `tool/_sloshcheck.dart` writes
+the settled/pour/rain surface lines to `out/_sloshcheck/` and asserts the
+calm pool is exactly flat, the pour stirs then decays, and rain stirs;
+`test/phase2_test.dart` adds the standing contract (flat at rest, stirs on a
+pour, decays to flat, volume conserved).
 
 **Fix (2026-09-25).** The pool's surface line gapped out under every
 falling drop in its column: the column scan stopped at the first water
@@ -391,7 +410,10 @@ thin sheet running off a wall pushes with the deep body's full head (erodes a
 low-tolerance partition); walls with tolerance > head are untouched, with
 tolerance < head erode; a confined body with head ≥ 8 jets upward out of an
 open crack (sustained, contiguous spurt); water volume is conserved over long
-runs (grid + spurt overlay).
+runs (grid + spurt overlay). The surface is flat where the water is at rest:
+water that lands (a pour, a falling column, rain) dips the line where it
+touches down, the ripples spread sideways, and they decay back to a flat
+line in a couple of seconds.
 
 ## Notes
 

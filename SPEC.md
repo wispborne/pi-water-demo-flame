@@ -61,6 +61,7 @@ Terminology follows `CONTEXT.md`; decisions of record live in `docs/adr/`.
 - **Pressure**: connected water shares one pressure per water body — the head from the body's own surface, carried sideways (a thin sheet running off a wall pushes with the deep pool's full depth). Pressure erodes adjacent wall material only once the head exceeds that material's tolerance (tanked concrete shrugs a shallow pool; deep water crushes slabs and washes rubble away).
 - **Jets**: deep water under a roof or in a body whose head is ≥ 8 cells jets upward out of any open crack; spurt height scales with the head.
 - Deep water under a roof can pour off and **cascade floor by floor**.
+- **Surface motion**: a calm pool's surface is a flat line. Water that lands — a pour, a falling column, rain, a jet, a broken wall dumping in — stirs a visible dip where it touches down, and the ripples spread sideways and decay back to flat in a couple of seconds. The surface is flat exactly where the water is at rest; there is no ambient swell.
 
 ## 5. Structural failure and buoyancy
 
@@ -82,7 +83,7 @@ Terminology follows `CONTEXT.md`; decisions of record live in `docs/adr/`.
 - Light beams are visible inside water as **forward-scattering shafts**, brightest near the light's own angle.
 - The water surface **glitters only where the sun actually reaches** (a roofed pool's surface stays calm as the sun crosses the sky), with the glint gathered in a band toward the sun; an open pool glitters brightest under the sun.
 - Sunlight concentrates into a **caustic drifting across the pool floor**.
-- The water surface renders as a wavy line (a slow swell plus two faster short waves) that moves with the water; water darkens quickly with depth, so a deep pool reads dark blue-green under a bright shimmering waterline.
+- The water surface renders as a line that is flat where the water is at rest and dips and ripples where water is landing; water darkens quickly with depth, so a deep pool reads dark blue-green under a bright shimmering waterline.
 - The image **settles to a clean, steady picture in about a second** instead of flickering; it follows slow changes (the drifting sun) with a short lag; when the world changes (water moves, a wall breaks) the light re-converges **only in the places that changed**.
 - **Fallback contract**: on a machine without the required graphics support, the scene quietly falls back to the plain 2D view and the toggle cannot switch on; if the graphics device gives up mid-run, it falls back and the toggle can switch back on. (Which graphics API is "required" is an implementation decision, not a spec one.)
 

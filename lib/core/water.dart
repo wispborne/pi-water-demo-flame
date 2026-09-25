@@ -48,6 +48,15 @@ class Spurt {
 /// * **Wash** — a sideways water move aimed at rubble or debris pushes the
 ///   grain into the open air beyond it and takes its cell (SPEC 4: deep
 ///   water washes rubble away); volume is conserved.
+/// * **Surface motion** — each column's at-rest surface carries a damped
+///   displacement: water arriving vertically kicks it (a landed drop, a
+///   poured column, a released spurt), the kick spreads sideways as
+///   travelling ripples (a 1-D damped wave), and a settled field decays to
+///   exactly zero, so a calm pool's surface is flat and the surface only
+///   moves with the water's own impacts, pours, and flows (SPEC 4/7). A
+///   slow level rise is sideways spread and leaves the surface alone. The
+///   motion is an overlay on the grid: it never moves a cell, so it costs
+///   nothing against volume conservation.
 /// Water volume is conserved: movement never creates or destroys water;
 /// water appears only via erosion (a wall cell crumbles into water), tools,
 /// and rain (a spurt's cells fall back into the column when the jet stops).
@@ -72,6 +81,48 @@ class Water {
   /// The spurt column per grid column (the jet's held column, an overlay).
   final List<Spurt> spurts;
 
+  /// The surface displacement per column (fixed-point, 1/16 of a cell,
+  /// signed): the damped motion the water's own impacts, pours, and flows
+  /// stir into the surface. A settled field decays to zero, so a calm pool
+  /// draws a flat line.
+  final List<int> elev;
+
+  /// The displacement's velocity per column (fixed-point, 1/16 of a cell
+  /// per tick).
+  final List<int> _vel;
+
+  /// The previous tick's surface rows (the impulse compares against them).
+  final List<int> _prevSurfRow;
+
+  /// The reusable next-step displacement buffer (the wave update reads the
+  /// old field symmetrically, so it writes to a side buffer first).
+  final List<int> _elevNext;
+
+  /// The at-rest surface row per column: the top of the column's first
+  /// at-rest water run (or the spurt's top while its jet is held), -1 when
+  /// the column has no at-rest surface. The drawn surface line, the traced
+  /// surface, and the motion model all read this one scan.
+  final List<int> surfRow;
+
+  /// Landing weight per column for the current settle pass: the mass (cell
+  /// count) of the water run that just touched down. The surface motion
+  /// kicks off this, not off surface-row changes: a level rise is a
+  /// sideways spread, not an impact. A landing is a down move whose cell
+  /// below is water that did not itself move down this pass (the bottom of
+  /// the falling run, not the run's interior), so a falling column counts
+  /// once, weighted by its height.
+  final List<int> _landing;
+
+  /// Pass stamp of the cell's last down move (a landing needs the water
+  /// below to carry an older stamp).
+  final List<int> _downStamp;
+  int _downGen = 0;
+
+  /// Until the first surface scan, a column's surface is "new" — but water
+  /// that was already at rest when the world was built must not count as an
+  /// arrival (a fresh pool would otherwise slosh once at t=0).
+  bool _surfInit = true;
+
   /// "Seen this body pass" stamp per cell (a flat array beats a fresh
   /// boolean list per tick: no allocation, no boxing).
   final List<int> _seen;
@@ -81,13 +132,35 @@ class Water {
   final List<int> _body = [];
   final List<int> _surf;
 
+  /// Surface motion tuning (fixed-point, 1/16 of a cell): the velocity
+  /// impulse per cell of landed water mass, the wave coefficient (c^2 =
+  /// 4/16, below the 1/2 stability limit of the explicit update), the
+  /// restoring spring to the rest level (removes the uniform mode), the
+  /// per-tick damping (240/256: a ripple dies in ~1-2 s at 30 ticks/s),
+  /// and the amplitude caps (velocity, displacement).
+  static const int _impulse = 4;
+  static const int _c2 = 4;
+  static const int _spring = 4;
+  static const int _dampNum = 240;
+  static const int _dampDen = 256;
+  static const int _velCap = 64;
+  static const int _elevCap = 48;
+  static const int _restSnap = 4;
+
   Water()
     : momentum = List.filled(Constants.gridW * Constants.gridH, 0),
       head = List.filled(Constants.gridW * Constants.gridH, 0),
       bodyHead = List.filled(Constants.gridW * Constants.gridH, 0),
       spurts = [for (var i = 0; i < Constants.gridW; i++) Spurt()],
       _seen = List.filled(Constants.gridW * Constants.gridH, 0),
-      _surf = List.filled(Constants.gridW, -1);
+      _surf = List.filled(Constants.gridW, -1),
+      elev = List.filled(Constants.gridW, 0),
+      _vel = List.filled(Constants.gridW, 0),
+      _prevSurfRow = List.filled(Constants.gridW, -1),
+      _elevNext = List.filled(Constants.gridW, 0),
+      _landing = List.filled(Constants.gridW, 0),
+      _downStamp = List.filled(Constants.gridW * Constants.gridH, 0),
+      surfRow = List.filled(Constants.gridW, -1);
 
   int _nextSeenGen() {
     _seenGen++;
@@ -129,6 +202,106 @@ class Water {
   void tick(World w) {
     _bodies(w); // head, bodyHead, erosion, the spurt pump + release
     _settle(w); // falling sand
+    _surfaceMotion(w); // damped ripples on the at-rest surface
+  }
+
+  // -- surface motion: damped ripples on the at-rest surface -------------
+
+  /// The surface displacement a renderer adds to the column's surface row,
+  /// in cells (the state is fixed-point 1/16).
+  double surfaceOffset(int x) => elev[x] / 16.0;
+
+  /// One step of the surface motion. The grid is read only: water arriving
+  /// in a column vertically (a landed drop, a poured column, a released
+  /// spurt — the settle pass's down moves) kicks that column's surface,
+  /// the displacement spreads to the neighbours as a damped 1-D wave, and
+  /// a settled field decays to zero (a calm pool's surface is flat).
+  void _surfaceMotion(World w) {
+    const W = Constants.gridW;
+    final H = Constants.gridH;
+    final cells = w.cells;
+    // 1. The at-rest surface row per column (the same rule the drawn line
+    //    uses: a spurt's top while its jet is held, else the top of the
+    //    first at-rest run — a run whose bottom cell sits on water or a
+    //    permanent wall).
+    for (var x = 0; x < W; x++) {
+      final s = spurts[x];
+      if (s.active) {
+        surfRow[x] = s.top;
+        continue;
+      }
+      var surf = -1;
+      var y = 0;
+      while (surf < 0 && y < H) {
+        if (cells[y * W + x] != Material.water) {
+          y++;
+          continue;
+        }
+        var bottom = y;
+        while (bottom + 1 < H &&
+            cells[(bottom + 1) * W + x] == Material.water) {
+          bottom++;
+        }
+        final below = bottom + 1 < H
+            ? cells[(bottom + 1) * W + x]
+            : Material.ground;
+        if (below == Material.water ||
+            Materials.blocksWaterByIndex[below.index]) {
+          surf = y;
+        }
+        y = bottom + 1;
+      }
+      surfRow[x] = surf;
+    }
+    if (_surfInit) {
+      // The first scan only establishes the baseline: what is already at
+      // rest at t=0 arrived before the simulation started.
+      _prevSurfRow.setRange(0, W, surfRow);
+      _surfInit = false;
+      return;
+    }
+    // 2. Impulses: the kick is the water that just landed in the column
+    //    (the settle pass's landing weight: a falling run touches down),
+    //    plus one cell when a surface newly forms. A level rise or drain
+    //    is sideways spread, not an impact, and leaves the surface alone.
+    for (var x = 0; x < W; x++) {
+      if (surfRow[x] < 0) continue;
+      var kick = _landing[x];
+      if (_prevSurfRow[x] < 0) kick += 1;
+      if (kick > 0) {
+        _vel[x] = (_vel[x] + kick * _impulse).clamp(-_velCap, _velCap);
+      }
+    }
+    _prevSurfRow.setRange(0, W, surfRow);
+    // 3. The damped wave: the displacement spreads to the at-rest
+    //    neighbours and decays; a column without an at-rest surface just
+    //    decays (a vanished surface leaves no frozen bump).
+    for (var x = 0; x < W; x++) {
+      if (surfRow[x] < 0) {
+        _vel[x] = (_vel[x] * _dampNum) ~/ _dampDen;
+        _elevNext[x] = (elev[x] * _dampNum) ~/ _dampDen;
+      } else {
+        final el = x > 0 && surfRow[x - 1] >= 0 ? elev[x - 1] : 0;
+        final er = x + 1 < W && surfRow[x + 1] >= 0 ? elev[x + 1] : 0;
+        // The neighbour coupling spreads the bump sideways; the spring
+        // pulls it back to the rest level — without it the uniform
+        // (whole-surface) mode has no restoring force and never decays.
+        final acc = _c2 * (el - 2 * elev[x] + er) ~/ 16 -
+            elev[x] * _spring ~/ 16;
+        var v = (_vel[x] * _dampNum) ~/ _dampDen + acc;
+        v = v.clamp(-_velCap, _velCap);
+        _vel[x] = v;
+        _elevNext[x] = (elev[x] + v).clamp(-_elevCap, _elevCap);
+      }
+      // Integer leapfrog locks into 1-unit cycles the damping can't kill
+      // (damping only bites at |v| * 240 >= 256): snap sub-quarter-cell
+      // motion to zero so a settled surface is exactly flat.
+      if (_vel[x].abs() <= _restSnap && _elevNext[x].abs() <= _restSnap) {
+        _vel[x] = 0;
+        _elevNext[x] = 0;
+      }
+    }
+    elev.setRange(0, W, _elevNext);
   }
 
   // -- bodies: BFS flood fill + heads + erosion + the spurt pump ---------
@@ -314,6 +487,12 @@ class Water {
   void _settle(World w) {
     const W = Constants.gridW;
     final H = Constants.gridH;
+    _landing.fillRange(0, W, 0);
+    _downGen++;
+    if (_downGen == 0) {
+      _downStamp.fillRange(0, W * H, 0);
+      _downGen = 1;
+    }
     for (var sub = 0; sub < Constants.settleSubsteps; sub++) {
       _moves = 0;
       for (var y = H - 1; y >= 0; y--) {
@@ -406,6 +585,26 @@ class Water {
     momentum[t] = (dy > 0 && dx == 0) ? 0 : momentum[src];
     head[t] = head[src];
     _moves++;
+    if (dy > 0 && dx == 0) {
+      // A down move: stamp the destination, and — when the cell below is
+      // water that did not move down this pass — the bottom of the falling
+      // run has landed: record it weighted by the run's mass (the cells
+      // still standing above the source, which move later in the scan).
+      _downStamp[t] = _downGen;
+      if (ny + 1 < H &&
+          w.cells[(ny + 1) * W + nx] == Material.water &&
+          _downStamp[(ny + 1) * W + nx] != _downGen) {
+        var mass = 1;
+        var yy = ny - 2; // above the source (ny - 1)
+        while (yy >= 0 &&
+            w.cells[yy * W + nx] == Material.water &&
+            mass < 64) {
+          yy--;
+          mass++;
+        }
+        _landing[nx] = (_landing[nx] + mass).clamp(0, 64);
+      }
+    }
     return true;
   }
 

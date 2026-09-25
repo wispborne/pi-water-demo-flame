@@ -74,6 +74,11 @@ Broken heavy building material; sinks; washed sideways by flowing water.
 
 **Debris**:
 Broken light things (furniture, wood); floats; washed sideways by flowing water.
+
+**Ripple**:
+The damped up-down motion the water's surface makes where water lands (a pour, a falling column, rain, a jet, a dumped wall); spreads sideways and decays back to a flat line in a couple of seconds. The surface is flat exactly where the water is at rest.
+_Avoid_: wave, swell (there is no ambient wave)
+
 ### Light
 
 **Light**:

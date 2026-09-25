@@ -195,7 +195,6 @@ class Tracer {
       water,
       sx,
       sy,
-      sun.timeSec,
     );
     var rays = 0;
 
