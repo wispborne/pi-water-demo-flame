@@ -38,6 +38,14 @@ flutter analyze
 
 `./run.sh` (macOS) builds the release app and launches it.
 
+## Windows machine
+
+`docs/windows-tooling.md` is the verified index of what works on this box,
+including `tool/windows/win.ps1` (window focus/move, mouse, keyboard,
+screenshots, clipboard). Use it when driving the live GUI; keep
+focus-stealing to one tight batch and restore the previous foreground window
+at the end.
+
 ## Invariants — do not break
 
 - **Determinism (ADR 0001, `docs/adr/`):** seed + settings → the exact t=0 world, run twice and across settings. All randomness goes through `lib/core/rng.dart` (FNV-1a-64 → PCG32, forked sub-streams). Never `dart:math.Random`; integer-only math in the core.
