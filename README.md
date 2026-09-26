@@ -34,7 +34,8 @@ is a pure-Dart package — headless-testable on any box; the GUI is the
     pancakes out instead of standing as a pillar; per-body BFS head
     (carried sideways), erosion at head > material tolerance, lateral
     momentum, jets (a head ≥ 8 confined body spurts out of an open crack as
-    a held spurt column), wash (flowing water scours rubble/debris
+    a held spurt column that falls back into the pool when its roof is gone),
+    wash (flowing water scours rubble/debris
     sideways), volume conserved; surface motion (a per-column damped
     elevation that dips where water lands — a pour, a falling column, rain,
     a jet, a dumped wall — and decays back to a flat line, so a calm pool is
