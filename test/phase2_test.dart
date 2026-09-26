@@ -216,6 +216,47 @@ void main() {
     expect(eng.isSpurtCell(20, s.top), isTrue);
   });
 
+  test('a spurt releases back into the pool when its roof is removed', () {
+    final w = bare();
+    ground(w, 238);
+    // Same 16-deep tank and roof as the jet test above.
+    w.fillRect(19, 222, 19, 237, Material.titanium);
+    w.fillRect(40, 222, 40, 237, Material.titanium);
+    for (var x = 19; x < 41; x++) {
+      w.set(x, 221, Material.titanium);
+    }
+    w.set(20, 221, Material.air);
+    for (var x = 20; x < 40; x++) {
+      for (var y = 222; y < 238; y++) {
+        w.set(x, y, Material.water);
+      }
+    }
+    final eng = Water();
+    for (var t = 0; t < 400; t++) eng.tick(w);
+    expect(
+      eng.spurts[20].active,
+      isTrue,
+      reason: 'precondition: no spurt under the roof',
+    );
+    final v0 = eng.countWater(w);
+
+    // The roof crumbles: the body is open to the sky again.
+    for (var x = 19; x < 41; x++) {
+      w.set(x, 221, Material.air);
+    }
+    for (var t = 0; t < 60; t++) eng.tick(w);
+    expect(
+      eng.spurts[20].active,
+      isFalse,
+      reason: 'spurt held after its roof was removed',
+    );
+    expect(
+      eng.countWater(w),
+      v0,
+      reason: 'volume changed through the release',
+    );
+  });
+
   test('the surface is flat at rest, stirs on a pour, and decays to flat', () {
     // A level pool at rest stirs nothing: the motion must come from the
     // water's own movement, not from the update itself.

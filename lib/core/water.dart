@@ -35,15 +35,16 @@ class Spurt {
 ///   (the vorticity-confinement analog) so water on a floor keeps flowing
 ///   sideways instead of freezing into a brick. A settled, level pool rests
 ///   (its cells are blocked by their neighbours).
-/// * **Jets** — a confined body (a surface column covered by a wall) whose
-///   maximum head is >= [Constants.jetMinHead] spurts upward out of an open
-///   crack: the spurt is a persistent column of cells above the body surface,
-///   grown cell by cell (one cell per tick, up to height ~= head/2, capped
-///   at [Constants.jetMaxHeight]); a spurt blocked by a wall stops growing
-///   but stays held. The spurt is an overlay: the pumped surface cells move
-///   out of the grid (the pool surface drops, since falling-sand water
-///   cannot rise) and the spurt column is drawn from [Spurt] state, always
-///   contiguous on top of the dropping surface.
+/// * **Jets** — a confined body (a wall — a roof — above it) whose maximum
+///   head is >= [Constants.jetMinHead] spurts upward out of an open crack: the
+///   spurt is a persistent column of cells above the body surface, grown cell
+///   by cell (one cell per tick, up to height ~= head/2, capped at
+///   [Constants.jetMaxHeight]); a spurt blocked by a wall stops growing but
+///   stays held. When the body opens to the sky (its roof is gone), the spurt
+///   releases and its cells fall back into the pool. The spurt is an overlay:
+///   the pumped surface cells move out of the grid (the pool surface drops,
+///   since falling-sand water cannot rise) and the spurt column is drawn from
+///   [Spurt] state, always contiguous on top of the dropping surface.
 ///
 /// * **Wash** — a sideways water move aimed at rubble or debris pushes the
 ///   grain into the open air beyond it and takes its cell (SPEC 4: deep
@@ -310,6 +311,7 @@ class Water {
     const W = Constants.gridW;
     final H = Constants.gridH;
     final colMaxHead = List.filled(W, 0);
+    final colConfined = List.filled(W, false);
     final cells = w.cells;
     final seen = _seen;
     final seenGen = _nextSeenGen();
@@ -350,43 +352,63 @@ class Water {
         if (maxHead > colMaxHead[x]) colMaxHead[x] = maxHead;
       }
       _erode(w, body, maxHead);
-      // A jet needs a confined body: at least one surface column covered
-      // by a real wall (furniture and rubble do not count — they move).
+      // A jet needs a confined body: at least one surface column with a real
+      // wall somewhere above it — a roof (furniture and rubble do not count,
+      // they move). Scan up to the top of the grid, not a fixed distance: the
+      // pump and the ripple sink the surface several rows below the roof, and
+      // a roof is a roof no matter how far the surface falls. Once the roof is
+      // gone the column is open to the sky and the body stops being confined.
       var confined = false;
       for (var x = 0; x < W; x++) {
         final sy = surf[x];
-        if (sy > 0 &&
-            Materials.blocksWaterByIndex[cells[(sy - 1) * W + x].index]) {
-          confined = true;
-          break;
+        if (sy <= 0) continue;
+        for (var y = sy - 1; y >= 0; y--) {
+          if (Materials.blocksWaterByIndex[cells[y * W + x].index]) {
+            confined = true;
+            break;
+          }
         }
+        if (confined) break;
       }
       if (maxHead >= Constants.jetMinHead && confined) {
         _jets(w, surf, maxHead);
+        for (var x = 0; x < W; x++) {
+          if (surf[x] != -1) colConfined[x] = true;
+        }
       }
       for (var x = 0; x < W; x++) {
         if (surf[x] != -1) surf[x] = -1;
       }
     }
-    // Release any spurt whose column is no longer deep enough (its cells
-    // fall back into the column), or reposition the others so the spurt
-    // stays contiguous on top of the dropping surface.
+    // Release any spurt whose column is no longer deep enough, or whose
+    // body is no longer confined (its roof is gone — a spurt must not
+    // outlive the body that pumped it); its cells fall back into the
+    // column. The others are repositioned so the spurt stays contiguous on
+    // top of the dropping surface.
     for (var x = 0; x < W; x++) {
       final s = spurts[x];
       if (!s.active) continue;
-      if (colMaxHead[x] < Constants.jetMinHead) {
-        _releaseSpurt(w, x);
+      final supported = colMaxHead[x] >= Constants.jetMinHead && colConfined[x];
+      if (supported) {
+        _repositionSpurt(w, x, H);
       } else {
-        var surfNow = -1;
-        for (var y = 0; y < H; y++) {
-          if (w.at(x, y) == Material.water) {
-            surfNow = y;
-            break;
-          }
-        }
-        s.top = (surfNow < 0 ? H - 1 : surfNow) - s.h;
+        _releaseSpurt(w, x);
       }
     }
+  }
+
+  /// Move the spurt so it sits contiguous on top of the column's current
+  /// grid surface (the pool drops as the pump feeds the spurt).
+  void _repositionSpurt(World w, int x, int H) {
+    final s = spurts[x];
+    var surfNow = -1;
+    for (var y = 0; y < H; y++) {
+      if (w.at(x, y) == Material.water) {
+        surfNow = y;
+        break;
+      }
+    }
+    s.top = (surfNow < 0 ? H - 1 : surfNow) - s.h;
   }
 
   /// Erode adjacent walls when the body's head exceeds the wall's tolerance.
